@@ -181,7 +181,7 @@ def item_pdf(item_id: int):
         return FileResponse(
             pdf_file,
             media_type="application/pdf",
-            filename=f"{item.bibtex_key or item_id}.pdf",
+            headers={"Content-Disposition": "inline"},
         )
     finally:
         session.close()
