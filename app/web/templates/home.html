@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Research Index — ホーム{% endblock %}
+{% block content %}
+<h1>Research Index</h1>
+
+<div class="stats">
+    <div class="stat-box">
+        <div class="stat-num">{{ item_count }}</div>
+        <div class="stat-label">登録数</div>
+    </div>
+    <div class="stat-box">
+        <div class="stat-num">{{ collections|length }}</div>
+        <div class="stat-label">コレクション</div>
+    </div>
+</div>
+
+<form class="search-form" action="/search" method="get">
+    <input type="text" name="q" placeholder="論文を検索..." class="search-input">
+    <button type="submit">検索</button>
+</form>
+
+{% if collections %}
+<h2>コレクション</h2>
+{% for coll in collections %}
+<div class="card">
+    <h3>{{ coll.name }}</h3>
+    <div class="meta">作成日: {{ coll.created_at.strftime('%Y-%m-%d') if coll.created_at else '?' }}</div>
+</div>
+{% endfor %}
+{% endif %}
+
+{% if recent_items %}
+<h2>最近追加された文献</h2>
+{% for item in recent_items %}
+<div class="card">
+    <h3><a href="/item/{{ item.id }}">{{ item.title }}</a></h3>
+    <div class="meta">
+        {{ item.author_names[:3] | join(', ') }}{% if item.author_names|length > 3 %} et al.{% endif %}
+        &middot; {{ item.year or '?' }}
+        &middot; {{ item.venue_instance or item.venue or '' }}
+        <span class="badge">{{ item.type }}</span>
+    </div>
+</div>
+{% endfor %}
+{% endif %}
+{% endblock %}

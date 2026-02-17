@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% block title %}Analytics — Research Index{% endblock %}
+{% block content %}
+<h1>Analytics</h1>
+
+<h2>Year x Venue</h2>
+{% if data.year_venue %}
+<table class="card" style="width:100%; border-collapse:collapse;">
+    <tr style="border-bottom:1px solid var(--border);">
+        <th style="text-align:left; padding:0.5rem;">Year</th>
+        <th style="text-align:left; padding:0.5rem;">Venue</th>
+        <th style="text-align:right; padding:0.5rem;">Count</th>
+    </tr>
+    {% for row in data.year_venue %}
+    <tr style="border-bottom:1px solid var(--border);">
+        <td style="padding:0.5rem;">{{ row.year }}</td>
+        <td style="padding:0.5rem;">{{ row.venue }}</td>
+        <td style="text-align:right; padding:0.5rem;">{{ row.count }}</td>
+    </tr>
+    {% endfor %}
+</table>
+{% else %}
+<p class="meta">No data.</p>
+{% endif %}
+
+<h2>Year x Collection</h2>
+{% if data.year_collection %}
+<table class="card" style="width:100%; border-collapse:collapse;">
+    <tr style="border-bottom:1px solid var(--border);">
+        <th style="text-align:left; padding:0.5rem;">Year</th>
+        <th style="text-align:left; padding:0.5rem;">Collection</th>
+        <th style="text-align:right; padding:0.5rem;">Count</th>
+    </tr>
+    {% for row in data.year_collection %}
+    <tr style="border-bottom:1px solid var(--border);">
+        <td style="padding:0.5rem;">{{ row.year }}</td>
+        <td style="padding:0.5rem;">{{ row.collection }}</td>
+        <td style="text-align:right; padding:0.5rem;">{{ row.count }}</td>
+    </tr>
+    {% endfor %}
+</table>
+{% else %}
+<p class="meta">No data.</p>
+{% endif %}
+
+<h2>Year x Tag</h2>
+{% if data.year_tag %}
+<table class="card" style="width:100%; border-collapse:collapse;">
+    <tr style="border-bottom:1px solid var(--border);">
+        <th style="text-align:left; padding:0.5rem;">Year</th>
+        <th style="text-align:left; padding:0.5rem;">Tag</th>
+        <th style="text-align:right; padding:0.5rem;">Count</th>
+    </tr>
+    {% for row in data.year_tag %}
+    <tr style="border-bottom:1px solid var(--border);">
+        <td style="padding:0.5rem;">{{ row.year }}</td>
+        <td style="padding:0.5rem;">{{ row.tag }}</td>
+        <td style="text-align:right; padding:0.5rem;">{{ row.count }}</td>
+    </tr>
+    {% endfor %}
+</table>
+{% else %}
+<p class="meta">No data.</p>
+{% endif %}
+
+<h2>Watch Collection Growth</h2>
+{% if data.watch_growth %}
+<table class="card" style="width:100%; border-collapse:collapse;">
+    <tr style="border-bottom:1px solid var(--border);">
+        <th style="text-align:left; padding:0.5rem;">Collection</th>
+        <th style="text-align:left; padding:0.5rem;">Date</th>
+        <th style="text-align:right; padding:0.5rem;">Cumulative</th>
+    </tr>
+    {% for row in data.watch_growth %}
+    <tr style="border-bottom:1px solid var(--border);">
+        <td style="padding:0.5rem;">{{ row.collection }}</td>
+        <td style="padding:0.5rem;">{{ row.date }}</td>
+        <td style="text-align:right; padding:0.5rem;">{{ row.cumulative_count }}</td>
+    </tr>
+    {% endfor %}
+</table>
+{% else %}
+<p class="meta">No watch collections yet.</p>
+{% endif %}
+
+<h2>Top Keyphrases by Year</h2>
+{% if data.keyphrases %}
+{% set ns = namespace(current_year=0) %}
+{% for row in data.keyphrases %}
+    {% if row.year != ns.current_year %}
+        {% if ns.current_year != 0 %}</div>{% endif %}
+        {% set ns.current_year = row.year %}
+        <h3>{{ row.year }}</h3>
+        <div class="card">
+    {% endif %}
+    <span class="badge" style="margin:0.15rem;">{{ row.phrase }} ({{ row.score }})</span>
+{% endfor %}
+{% if data.keyphrases %}</div>{% endif %}
+{% else %}
+<p class="meta">Not enough data for keyphrase extraction (need 2+ items per year).</p>
+{% endif %}
+
+{% endblock %}

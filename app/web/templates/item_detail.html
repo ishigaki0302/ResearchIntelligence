@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% block title %}{{ item.title }} — Research Index{% endblock %}
+{% block content %}
+<div style="margin-bottom: 0.5rem;">
+    <a href="/search">&larr; 検索に戻る</a>
+</div>
+
+<h1>{{ item.title }}</h1>
+
+<div class="meta" style="margin-bottom: 1rem;">
+    <strong>著者:</strong> {{ item.author_names | join(', ') or '不明' }}<br>
+    <strong>年:</strong> {{ item.year or '?' }}
+    &middot; <strong>Venue:</strong> {{ item.venue_instance or item.venue or '—' }}
+    &middot; <strong>種別:</strong> <span class="badge">{{ item.type }}</span>
+    &middot; <strong>BibTeX Key:</strong> <code>{{ item.bibtex_key or '—' }}</code>
+</div>
+
+{% if item.source_url %}
+<div style="margin-bottom: 1rem;">
+    <a href="{{ item.source_url }}" target="_blank" class="btn btn-secondary">原文リンク</a>
+    {% if item.pdf_path %}
+    <span class="badge" style="margin-left: 0.5rem;">PDF あり</span>
+    {% endif %}
+</div>
+{% endif %}
+
+<div class="card" style="margin-bottom: 1rem;">
+    <h2 style="margin-top: 0;">タグ</h2>
+    <div style="display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.5rem;">
+    {% for tag in tags %}
+        <span class="badge" style="display: inline-flex; align-items: center; gap: 0.3rem;">
+            {{ tag }}
+            <form action="/item/{{ item.id }}/tag/{{ tag }}/delete" method="post" style="display:inline; margin:0;">
+                <button type="submit" style="background:none; border:none; cursor:pointer; padding:0; font-size:0.9em;" title="削除">&times;</button>
+            </form>
+        </span>
+    {% endfor %}
+    {% if not tags %}
+        <span style="color: #888;">(タグなし)</span>
+    {% endif %}
+    </div>
+    <form action="/item/{{ item.id }}/tag" method="post" style="display: flex; gap: 0.5rem;">
+        <input type="text" name="tag_name" placeholder="タグを追加 (例: method/RAG)" style="flex: 1; padding: 0.3rem;">
+        <button type="submit">追加</button>
+    </form>
+</div>
+
+{% if item.abstract %}
+<h2>Abstract</h2>
+<div class="abstract">{{ item.abstract }}</div>
+{% endif %}
+
+{% if item.bibtex_raw %}
+<h2>BibTeX</h2>
+<pre>{{ item.bibtex_raw }}</pre>
+{% endif %}
+
+<h2>ノート</h2>
+{% for note in notes %}
+<div class="card">
+    <h3>{{ note.title }}</h3>
+    <form action="/item/{{ item.id }}/note/{{ note.id }}/save" method="post">
+        <textarea name="content">{{ note_contents.get(note.id, '') }}</textarea>
+        <div style="margin-top: 0.5rem;">
+            <button type="submit">保存</button>
+        </div>
+    </form>
+</div>
+{% endfor %}
+
+{% if graph and (graph.cites or graph.cited_by) %}
+<h2>引用グラフ</h2>
+<div class="card">
+    {% if graph.cites %}
+    <h3>この論文が引用 ({{ graph.cites|length }}件)</h3>
+    <ul>
+    {% for c in graph.cites %}
+        <li><a href="/item/{{ c.id }}">{{ c.title }}</a> ({{ c.year or '?' }})</li>
+    {% endfor %}
+    </ul>
+    {% endif %}
+    {% if graph.cited_by %}
+    <h3>この論文を引用 ({{ graph.cited_by|length }}件)</h3>
+    <ul>
+    {% for c in graph.cited_by %}
+        <li><a href="/item/{{ c.id }}">{{ c.title }}</a> ({{ c.year or '?' }})</li>
+    {% endfor %}
+    </ul>
+    {% endif %}
+    <div style="margin-top: 0.5rem;">
+        <a href="/graph/{{ item.id }}" class="btn btn-secondary">グラフを表示</a>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

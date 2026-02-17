@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}検索 — Research Index{% endblock %}
+{% block content %}
+<h1>検索</h1>
+
+<form class="search-form" action="/search" method="get">
+    <input type="text" name="q" value="{{ query }}" placeholder="論文・ノートを検索..." class="search-input" autofocus>
+    <button type="submit">検索</button>
+</form>
+
+<div class="filter-row" style="margin-bottom: 1rem;">
+    <form action="/search" method="get" style="display:flex; gap:0.5rem; flex-wrap:wrap; align-items:center;">
+        <input type="hidden" name="q" value="{{ query }}">
+        <label>年:</label>
+        <input type="text" name="year" value="{{ year }}" placeholder="2024 or 2023:2024" style="width:120px;">
+        <label>Venue:</label>
+        <input type="text" name="venue" value="{{ venue }}" placeholder="ACL" style="width:100px;">
+        <label>種別:</label>
+        <select name="type">
+            <option value="">すべて</option>
+            <option value="paper" {% if item_type == 'paper' %}selected{% endif %}>Paper</option>
+            <option value="blog" {% if item_type == 'blog' %}selected{% endif %}>Blog</option>
+            <option value="slide" {% if item_type == 'slide' %}selected{% endif %}>Slide</option>
+        </select>
+        <button type="submit">絞り込み</button>
+    </form>
+</div>
+
+{% if query %}
+<div class="meta" style="margin-bottom: 1rem;">
+    "{{ query }}" の検索結果: {{ results|length }}件
+</div>
+{% endif %}
+
+{% for r in results %}
+{% set item = r.item %}
+{% if item %}
+<div class="card">
+    <h3><a href="/item/{{ item.id }}">{{ item.title }}</a></h3>
+    <div class="meta">
+        {{ item.author_names[:3] | join(', ') }}{% if item.author_names|length > 3 %} et al.{% endif %}
+        &middot; {{ item.year or '?' }}
+        &middot; {{ item.venue_instance or item.venue or '' }}
+        <span class="badge">{{ item.type }}</span>
+        &middot; スコア: {{ "%.3f"|format(r.score) }}
+    </div>
+    {% if r.snippet %}
+    <div class="snippet">{{ r.snippet | safe }}</div>
+    {% elif item.abstract %}
+    <div class="snippet">{{ item.abstract[:200] }}{% if item.abstract|length > 200 %}...{% endif %}</div>
+    {% endif %}
+</div>
+{% endif %}
+{% endfor %}
+
+{% if query and not results %}
+<div class="card">
+    <p>該当する結果が見つかりませんでした。別のクエリを試すか、<code>ri index</code> でインデックスを再構築してください。</p>
+</div>
+{% endif %}
+{% endblock %}

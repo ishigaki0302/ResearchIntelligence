@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}Watches — Research Index{% endblock %}
+{% block content %}
+<h1>Watches</h1>
+
+<div class="card">
+    <h2>Add Watch</h2>
+    <form method="post" action="/watches" style="display:flex; gap:0.5rem; flex-wrap:wrap; align-items:end;">
+        <div>
+            <label class="meta">Name</label><br>
+            <input type="text" name="name" required placeholder="my-watch">
+        </div>
+        <div>
+            <label class="meta">Source</label><br>
+            <select name="source">
+                <option value="arxiv">arXiv</option>
+                <option value="openalex">OpenAlex</option>
+            </select>
+        </div>
+        <div>
+            <label class="meta">Query</label><br>
+            <input type="text" name="query" required placeholder="retrieval augmented generation" style="min-width:250px;">
+        </div>
+        <div>
+            <label class="meta">Category (arXiv)</label><br>
+            <input type="text" name="category" placeholder="cs.CL">
+        </div>
+        <button type="submit">Add</button>
+    </form>
+</div>
+
+{% if watches %}
+<h2>Active Watches</h2>
+{% for w in watches %}
+<div class="card" style="display:flex; justify-content:space-between; align-items:center;">
+    <div>
+        <h3>{{ w.name }}</h3>
+        <p class="meta">
+            Source: <span class="badge">{{ w.source }}</span>
+            Query: {{ w.query }}
+            {% if w.filters_json %}| Filters: {{ w.filters_json }}{% endif %}
+            | {{ "Enabled" if w.enabled else "Disabled" }}
+        </p>
+    </div>
+    <div style="display:flex; gap:0.5rem;">
+        <form method="post" action="/watches/{{ w.id }}/toggle">
+            <button type="submit" class="btn-secondary" style="font-size:0.8rem; padding:0.3rem 0.6rem;">
+                {{ "Disable" if w.enabled else "Enable" }}
+            </button>
+        </form>
+        <form method="post" action="/watches/{{ w.id }}/run">
+            <button type="submit" style="font-size:0.8rem; padding:0.3rem 0.6rem;">Run</button>
+        </form>
+    </div>
+</div>
+{% endfor %}
+{% else %}
+<p class="meta">No watches yet. Add one above.</p>
+{% endif %}
+{% endblock %}

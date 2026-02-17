@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}コレクション — Research Index{% endblock %}
+{% block content %}
+<h1>コレクション</h1>
+
+{% if collections %}
+{% for coll in collections %}
+<div class="card">
+    <h3>{{ coll.name }}</h3>
+    <div class="meta">
+        作成日: {{ coll.created_at.strftime('%Y-%m-%d') if coll.created_at else '?' }}
+        &middot; {{ coll.item_links|length }}件
+    </div>
+</div>
+{% endfor %}
+{% else %}
+<div class="card">
+    <p>コレクションはまだありません。<code>ri import acl:2024</code> で作成できます。</p>
+</div>
+{% endif %}
+{% endblock %}

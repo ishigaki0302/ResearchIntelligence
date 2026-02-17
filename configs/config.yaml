@@ -1,0 +1,54 @@
+storage:
+  base_dir: "data"
+  library_dir: "data/library/papers"
+  cache_raw_dir: "data/cache/raw"
+  cache_embeddings_dir: "data/cache/embeddings"
+  db_path: "db/app.sqlite"
+
+embedding:
+  backend: "sentence-transformers"
+  model: "all-MiniLM-L6-v2"
+  dimension: 384
+  # For OpenAI (future):
+  # backend: "openai"
+  # model: "text-embedding-3-small"
+  # api_key_env: "OPENAI_API_KEY"
+
+indexing:
+  bm25_backend: "fts5"  # "fts5" or "whoosh"
+  faiss_index_path: "data/cache/embeddings/faiss.index"
+  faiss_id_map_path: "data/cache/embeddings/faiss_ids.json"
+
+download:
+  max_workers: 4
+  sleep_sec: 1.0
+  timeout: 60
+  user_agent: "ResearchIndex/0.3"
+
+external:
+  openalex:
+    enabled: true
+    email: ""  # polite pool
+  semantic_scholar:
+    enabled: true
+    api_key: ""  # optional, for higher rate limits
+  enrich:
+    match_threshold: 0.85
+    sleep_sec: 1.0
+
+web:
+  host: "127.0.0.1"
+  port: 8000
+
+search:
+  default_top_k: 20
+  bm25_weight: 0.5
+  vector_weight: 0.5
+
+watch:
+  arxiv:
+    sleep_sec: 3.0
+    max_results: 100
+  openalex:
+    sleep_sec: 1.0
+    max_results: 100

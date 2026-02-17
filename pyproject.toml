@@ -1,0 +1,58 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "research-index"
+version = "0.3.0"
+description = "Local paper/article management + search + visualization system"
+requires-python = ">=3.11"
+dependencies = [
+    "sqlalchemy>=2.0",
+    "pyyaml>=6.0",
+    "typer>=0.9",
+    "requests>=2.31",
+    "bibtexparser>=1.4,<2.0",
+    "pdfplumber>=0.10",
+    "readability-lxml>=0.8",
+    "lxml>=5.0",
+    "lxml_html_clean>=0.1",
+    "sentence-transformers>=2.2",
+    "faiss-cpu>=1.7",
+    "numpy>=1.24",
+    "fastapi>=0.104",
+    "uvicorn[standard]>=0.24",
+    "jinja2>=3.1",
+    "python-multipart>=0.0.6",
+    "scikit-learn>=1.3",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4",
+    "pytest-cov>=4.1",
+    "httpx>=0.25",
+    "ruff>=0.4",
+    "black>=24.0",
+]
+
+[project.scripts]
+ri = "app.cli.main:main"
+
+[tool.setuptools.packages.find]
+include = ["app*"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]
+
+[tool.black]
+target-version = ["py311"]
+line-length = 120
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

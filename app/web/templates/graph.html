@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block title %}引用グラフ — {{ item.title }}{% endblock %}
+{% block extra_head %}
+<script src="https://d3js.org/d3.v7.min.js"></script>
+{% endblock %}
+{% block content %}
+<div style="margin-bottom: 0.5rem;">
+    <a href="/item/{{ item.id }}">&larr; {{ item.title[:50] }}... に戻る</a>
+</div>
+
+<h1>引用グラフ</h1>
+<div class="meta">中心: {{ item.title }}</div>
+
+<div id="graph" class="graph-container" style="margin-top: 1rem;"></div>
+
+<script>
+const data = {{ graph_json | safe }};
+const width = document.getElementById('graph').clientWidth;
+const height = 400;
+
+const nodes = [];
+const nodeMap = {};
+
+function addNode(info, group) {
+    if (!nodeMap[info.id]) {
+        const n = {id: info.id, title: info.title, year: info.year, group: group};
+        nodes.push(n);
+        nodeMap[info.id] = n;
+    }
+}
+
+addNode(data.center, 'center');
+(data.cites || []).forEach(c => addNode(c, 'cites'));
+(data.cited_by || []).forEach(c => addNode(c, 'cited_by'));
+
+const links = (data.edges || []).map(e => ({source: e.src, target: e.dst}));
+
+const svg = d3.select('#graph').append('svg')
+    .attr('width', width).attr('height', height);
+
+const sim = d3.forceSimulation(nodes)
+    .force('link', d3.forceLink(links).id(d => d.id).distance(120))
+    .force('charge', d3.forceManyBody().strength(-300))
+    .force('center', d3.forceCenter(width/2, height/2));
+
+const link = svg.selectAll('line').data(links).join('line')
+    .attr('stroke', '#999').attr('stroke-opacity', 0.6)
+    .attr('marker-end', 'url(#arrow)');
+
+svg.append('defs').append('marker')
+    .attr('id', 'arrow').attr('viewBox', '0 0 10 10')
+    .attr('refX', 20).attr('refY', 5)
+    .attr('markerWidth', 6).attr('markerHeight', 6)
+    .attr('orient', 'auto-start-reverse')
+    .append('path').attr('d', 'M 0 0 L 10 5 L 0 10 z').attr('fill', '#999');
+
+const colors = {center: '#2563eb', cites: '#059669', cited_by: '#d97706'};
+const node = svg.selectAll('g').data(nodes).join('g')
+    .call(d3.drag()
+        .on('start', (e,d) => { if(!e.active) sim.alphaTarget(0.3).restart(); d.fx=d.x; d.fy=d.y; })
+        .on('drag', (e,d) => { d.fx=e.x; d.fy=e.y; })
+        .on('end', (e,d) => { if(!e.active) sim.alphaTarget(0); d.fx=null; d.fy=null; })
+    );
+
+node.append('circle').attr('r', d => d.group === 'center' ? 10 : 7)
+    .attr('fill', d => colors[d.group])
+    .attr('cursor', 'pointer')
+    .on('click', (e, d) => window.location.href = '/item/' + d.id);
+
+node.append('text')
+    .text(d => d.title.length > 30 ? d.title.slice(0,30)+'...' : d.title)
+    .attr('x', 12).attr('y', 4).attr('font-size', '11px').attr('fill', '#333');
+
+sim.on('tick', () => {
+    link.attr('x1', d=>d.source.x).attr('y1', d=>d.source.y)
+        .attr('x2', d=>d.target.x).attr('y2', d=>d.target.y);
+    node.attr('transform', d => `translate(${d.x},${d.y})`);
+});
+</script>
+
+<div style="margin-top:1rem;" class="meta">
+    <span style="color:#2563eb;">&#9679;</span> 中心 &nbsp;
+    <span style="color:#059669;">&#9679;</span> 引用先 &nbsp;
+    <span style="color:#d97706;">&#9679;</span> 被引用
+</div>
+{% endblock %}
