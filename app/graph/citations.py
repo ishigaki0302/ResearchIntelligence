@@ -1,5 +1,6 @@
 """Citation graph construction and querying."""
 
+import json
 import logging
 import re
 from typing import Any
@@ -128,20 +129,36 @@ def build_citations_from_metadata(
             if not matched_item_id and ref_ext.get("CorpusId"):
                 matched_item_id = id_lookup.get(("s2", str(ref_ext["CorpusId"])))
 
-            if not matched_item_id or matched_item_id == item.id:
+            if matched_item_id == item.id:
                 continue
 
             # Create citation with dedup
             raw_text = ref_title[:500] if ref_title else ref.get("paperId", "")[:500]
-            normalized = re.sub(r"\s+", " ", raw_text.strip().lower())
-            cite_hash = hashlib.sha256(
-                f"metadata:{item.id}:{matched_item_id}".encode("utf-8")
-            ).hexdigest()
+            dst_key = ref_ext.get("DOI") or ref_ext.get("ArXiv") or None
+
+            if matched_item_id:
+                cite_hash = hashlib.sha256(
+                    f"metadata:{item.id}:{matched_item_id}".encode("utf-8")
+                ).hexdigest()
+            else:
+                # Unmatched: use paperId for dedup
+                ref_pid = ref.get("paperId", raw_text)
+                cite_hash = hashlib.sha256(
+                    f"metadata:{item.id}:ext:{ref_pid}".encode("utf-8")
+                ).hexdigest()
 
             if cite_hash in existing_hashes:
                 continue
 
-            dst_key = ref_ext.get("DOI") or ref_ext.get("ArXiv") or None
+            # Store S2 external IDs in context for later import
+            context_data = None
+            if not matched_item_id:
+                context_data = json.dumps({
+                    "s2_paper_id": ref.get("paperId"),
+                    "external_ids": ref_ext,
+                    "title": ref_title,
+                }, ensure_ascii=False)
+
             cit = Citation(
                 src_item_id=item.id,
                 dst_item_id=matched_item_id,
@@ -149,6 +166,7 @@ def build_citations_from_metadata(
                 dst_key=dst_key,
                 source="metadata",
                 raw_cite_hash=cite_hash,
+                context=context_data,
             )
             session.add(cit)
             existing_hashes.add(cite_hash)
@@ -342,13 +360,18 @@ def get_citation_subgraph(session: Session, item_id: int, depth: int = 1) -> dic
                 edges.append({"src": item_id, "dst": dst.id})
                 seen_items.add(dst.id)
         else:
-            unresolved_refs.append(
-                {
-                    "citation_id": c.id,
-                    "raw_cite": (c.raw_cite or "")[:200],
-                    "dst_key": c.dst_key,
-                }
-            )
+            ref_info = {
+                "citation_id": c.id,
+                "raw_cite": (c.raw_cite or "")[:200],
+                "dst_key": c.dst_key,
+                "source": c.source,
+            }
+            if c.context:
+                try:
+                    ref_info["context"] = json.loads(c.context)
+                except (json.JSONDecodeError, TypeError):
+                    pass
+            unresolved_refs.append(ref_info)
 
     # Incoming citations (... cites this item)
     in_cits = session.execute(select(Citation).where(Citation.dst_item_id == item_id)).scalars().all()

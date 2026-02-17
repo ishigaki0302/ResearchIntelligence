@@ -12,7 +12,7 @@ from sqlalchemy import func, select
 
 from app.core.config import resolve_path
 from app.core.db import get_session, init_db
-from app.core.models import Citation, Collection, InboxItem, Item, Job, Note, Tag, Watch
+from app.core.models import Citation, Collection, InboxItem, Item, ItemId, Job, Note, Tag, Watch
 from app.core.service import add_tag_to_item, list_tags_for_item, remove_tag_from_item
 from app.graph.citations import get_citation_subgraph
 from app.indexing.engine import hybrid_search
@@ -559,6 +559,70 @@ def resolve_citation_api(citation_id: int, target_item_id: int = Form(...)):
         citation.dst_item_id = target_item_id
         session.commit()
         return JSONResponse({"ok": True, "citation_id": citation_id, "dst_item_id": target_item_id})
+    finally:
+        session.close()
+
+
+@app.post("/api/citation/{citation_id}/import")
+def import_citation_api(citation_id: int):
+    """Create a new Item from an unresolved citation's S2 metadata and resolve the citation."""
+    session = get_session()
+    try:
+        citation = session.get(Citation, citation_id)
+        if not citation:
+            return JSONResponse({"error": "Citation not found"}, status_code=404)
+        if citation.dst_item_id:
+            return JSONResponse({"error": "Citation already resolved", "item_id": citation.dst_item_id}, status_code=400)
+
+        # Parse S2 metadata from context
+        ctx = {}
+        if citation.context:
+            try:
+                ctx = json.loads(citation.context)
+            except (json.JSONDecodeError, TypeError):
+                pass
+
+        title = ctx.get("title") or citation.raw_cite or ""
+        if not title:
+            return JSONResponse({"error": "No title available"}, status_code=400)
+
+        ext_ids = ctx.get("external_ids", {})
+
+        # Check if item already exists by external IDs
+        for id_type, s2_key in [("doi", "DOI"), ("arxiv", "ArXiv"), ("acl", "ACL")]:
+            if ext_ids.get(s2_key):
+                existing = session.execute(
+                    select(ItemId).where(ItemId.id_type == id_type, ItemId.id_value == ext_ids[s2_key])
+                ).scalar_one_or_none()
+                if existing:
+                    citation.dst_item_id = existing.item_id
+                    session.commit()
+                    return JSONResponse({"ok": True, "item_id": existing.item_id, "action": "resolved_existing"})
+
+        # Create new item
+        new_item = Item(
+            title=title.strip(),
+            type="paper",
+            source_url=f"https://doi.org/{ext_ids['DOI']}" if ext_ids.get("DOI") else None,
+        )
+        session.add(new_item)
+        session.flush()
+
+        # Add external IDs
+        for id_type, s2_key in [("doi", "DOI"), ("arxiv", "ArXiv"), ("acl", "ACL")]:
+            if ext_ids.get(s2_key):
+                iid = ItemId(item_id=new_item.id, id_type=id_type, id_value=ext_ids[s2_key])
+                session.add(iid)
+        s2_pid = ctx.get("s2_paper_id") or (str(ext_ids["CorpusId"]) if ext_ids.get("CorpusId") else None)
+        if s2_pid:
+            iid = ItemId(item_id=new_item.id, id_type="s2", id_value=s2_pid)
+            session.add(iid)
+
+        # Resolve the citation
+        citation.dst_item_id = new_item.id
+        session.commit()
+
+        return JSONResponse({"ok": True, "item_id": new_item.id, "title": title, "action": "created"})
     finally:
         session.close()
 

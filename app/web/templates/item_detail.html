@@ -148,10 +148,77 @@ function copyBibtex() {
         <p class="meta">解決済み引用なし</p>
         {% endif %}
 
-        {% if graph.unresolved_refs %}
-        <h3 style="margin-top:1rem;">未解決の参照 ({{ graph.unresolved_refs|length }}件)</h3>
+        {% set s2_refs = graph.unresolved_refs | selectattr('source', 'equalto', 'metadata') | list %}
+        {% set other_refs = graph.unresolved_refs | rejectattr('source', 'equalto', 'metadata') | list %}
+
+        {% if s2_refs %}
+        <h3 style="margin-top:1rem;">DB外の参照 — S2 API ({{ s2_refs|length }}件)</h3>
+        <table style="width:100%; border-collapse:collapse; font-size:0.9em;">
+            <thead>
+                <tr style="border-bottom:2px solid #ddd;">
+                    <th style="text-align:left; padding:0.3rem;">タイトル</th>
+                    <th style="text-align:left; padding:0.3rem; width:120px;">ID</th>
+                    <th style="padding:0.3rem; width:80px;"></th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for ref in s2_refs[:50] %}
+                <tr id="s2ref-row-{{ ref.citation_id }}" style="border-bottom:1px solid #eee;">
+                    <td style="padding:0.3rem;">
+                        {% if ref.context and ref.context.title %}
+                            {{ ref.context.title }}
+                        {% else %}
+                            {{ ref.raw_cite }}
+                        {% endif %}
+                    </td>
+                    <td style="padding:0.3rem;">
+                        {% if ref.dst_key %}<code style="font-size:0.8em;">{{ ref.dst_key }}</code>{% endif %}
+                    </td>
+                    <td style="padding:0.3rem; text-align:center;">
+                        <button onclick="importCitation({{ ref.citation_id }})" id="btn-import-{{ ref.citation_id }}" style="font-size:0.8em; padding:0.2rem 0.5rem;">DBに追加</button>
+                    </td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+        {% if s2_refs|length > 50 %}
+        <p class="meta">... 他 {{ s2_refs|length - 50 }}件</p>
+        {% endif %}
+        <script>
+        function importCitation(citationId) {
+            var btn = document.getElementById('btn-import-' + citationId);
+            btn.disabled = true;
+            btn.textContent = '追加中...';
+            fetch('/api/citation/' + citationId + '/import', { method: 'POST' })
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (data.ok) {
+                        var row = document.getElementById('s2ref-row-' + citationId);
+                        var titleCell = row.cells[0];
+                        var link = document.createElement('a');
+                        link.href = '/item/' + data.item_id;
+                        link.textContent = titleCell.textContent.trim();
+                        titleCell.textContent = '';
+                        titleCell.appendChild(link);
+                        btn.textContent = data.action === 'created' ? '追加済み' : '解決済み';
+                        btn.style.color = '#28a745';
+                    } else {
+                        btn.textContent = 'エラー';
+                        btn.style.color = '#dc3545';
+                    }
+                })
+                .catch(function() {
+                    btn.textContent = 'エラー';
+                    btn.disabled = false;
+                });
+        }
+        </script>
+        {% endif %}
+
+        {% if other_refs %}
+        <h3 style="margin-top:1rem;">未解決の参照 ({{ other_refs|length }}件)</h3>
         <ul style="font-size:0.85em; color:#666;">
-        {% for ref in graph.unresolved_refs[:20] %}
+        {% for ref in other_refs[:20] %}
             <li style="margin-bottom:0.5rem;">
                 {{ ref.raw_cite }}{% if ref.dst_key %} <code>[{{ ref.dst_key }}]</code>{% endif %}
                 {% if ref.citation_id %}
@@ -162,8 +229,8 @@ function copyBibtex() {
                 {% endif %}
             </li>
         {% endfor %}
-        {% if graph.unresolved_refs|length > 20 %}
-            <li>... 他 {{ graph.unresolved_refs|length - 20 }}件</li>
+        {% if other_refs|length > 20 %}
+            <li>... 他 {{ other_refs|length - 20 }}件</li>
         {% endif %}
         </ul>
         {% endif %}
