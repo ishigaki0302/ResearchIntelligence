@@ -11,6 +11,8 @@
 <div class="filter-row" style="margin-bottom: 1rem;">
     <form action="/search" method="get" style="display:flex; gap:0.5rem; flex-wrap:wrap; align-items:center;">
         <input type="hidden" name="q" value="{{ query }}">
+        <label>著者:</label>
+        <input type="text" name="author" value="{{ author }}" placeholder="著者名" style="width:140px;">
         <label>年:</label>
         <input type="text" name="year" value="{{ year }}" placeholder="2024 or 2023:2024" style="width:120px;">
         <label>Venue:</label>
@@ -86,7 +88,7 @@
 {% if query and total_pages > 1 %}
 <nav style="display:flex; justify-content:center; align-items:center; gap:0.5rem; margin:1.5rem 0;">
     {% if page > 1 %}
-    <a href="/search?q={{ query|urlencode }}&page={{ page - 1 }}&per_page={{ per_page }}{% if year %}&year={{ year }}{% endif %}{% if venue %}&venue={{ venue }}{% endif %}{% if tag %}&tag={{ tag }}{% endif %}{% if item_type %}&type={{ item_type }}{% endif %}"
+    <a href="/search?q={{ query|urlencode }}&page={{ page - 1 }}&per_page={{ per_page }}{% if author %}&author={{ author }}{% endif %}{% if year %}&year={{ year }}{% endif %}{% if venue %}&venue={{ venue }}{% endif %}{% if tag %}&tag={{ tag }}{% endif %}{% if item_type %}&type={{ item_type }}{% endif %}"
        class="btn btn-secondary" style="font-size:0.85rem; padding:0.3rem 0.8rem;">&larr; 前へ</a>
     {% endif %}
 
@@ -94,7 +96,7 @@
         {% if p == page %}
         <span class="btn" style="font-size:0.85rem; padding:0.3rem 0.8rem;">{{ p }}</span>
         {% elif p <= 3 or p >= total_pages - 1 or (p >= page - 2 and p <= page + 2) %}
-        <a href="/search?q={{ query|urlencode }}&page={{ p }}&per_page={{ per_page }}{% if year %}&year={{ year }}{% endif %}{% if venue %}&venue={{ venue }}{% endif %}{% if tag %}&tag={{ tag }}{% endif %}{% if item_type %}&type={{ item_type }}{% endif %}"
+        <a href="/search?q={{ query|urlencode }}&page={{ p }}&per_page={{ per_page }}{% if author %}&author={{ author }}{% endif %}{% if year %}&year={{ year }}{% endif %}{% if venue %}&venue={{ venue }}{% endif %}{% if tag %}&tag={{ tag }}{% endif %}{% if item_type %}&type={{ item_type }}{% endif %}"
            class="btn btn-secondary" style="font-size:0.85rem; padding:0.3rem 0.8rem;">{{ p }}</a>
         {% elif p == 4 or p == total_pages - 2 %}
         <span style="color:var(--muted);">…</span>
@@ -102,7 +104,7 @@
     {% endfor %}
 
     {% if page < total_pages %}
-    <a href="/search?q={{ query|urlencode }}&page={{ page + 1 }}&per_page={{ per_page }}{% if year %}&year={{ year }}{% endif %}{% if venue %}&venue={{ venue }}{% endif %}{% if tag %}&tag={{ tag }}{% endif %}{% if item_type %}&type={{ item_type }}{% endif %}"
+    <a href="/search?q={{ query|urlencode }}&page={{ page + 1 }}&per_page={{ per_page }}{% if author %}&author={{ author }}{% endif %}{% if year %}&year={{ year }}{% endif %}{% if venue %}&venue={{ venue }}{% endif %}{% if tag %}&tag={{ tag }}{% endif %}{% if item_type %}&type={{ item_type }}{% endif %}"
        class="btn btn-secondary" style="font-size:0.85rem; padding:0.3rem 0.8rem;">次へ &rarr;</a>
     {% endif %}
 </nav>

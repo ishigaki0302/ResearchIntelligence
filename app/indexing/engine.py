@@ -504,6 +504,10 @@ def hybrid_search(
                 ).first()
                 if not tag_match:
                     continue
+            if filters.get("author"):
+                author_query = filters["author"].lower()
+                if not any(author_query in name.lower() for name in item.author_names):
+                    continue
 
             result["item"] = item
             filtered.append(result)

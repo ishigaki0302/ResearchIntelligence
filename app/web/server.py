@@ -58,6 +58,7 @@ def home(request: Request):
 def search_page(
     request: Request,
     q: str = Query(""),
+    author: Optional[str] = Query(None),
     year: Optional[str] = Query(None),
     venue: Optional[str] = Query(None),
     tag: Optional[str] = Query(None),
@@ -68,25 +69,27 @@ def search_page(
     session = get_session()
     try:
         all_results = []
-        if q:
-            filters = {}
-            if year:
-                if ":" in year:
-                    parts = year.split(":")
-                    if parts[0]:
-                        filters["year_from"] = int(parts[0])
-                    if parts[1]:
-                        filters["year_to"] = int(parts[1])
-                else:
-                    filters["year_from"] = int(year)
-                    filters["year_to"] = int(year)
-            if venue:
-                filters["venue"] = venue
-            if tag:
-                filters["tag"] = tag
-            if item_type:
-                filters["type"] = item_type
+        filters = {}
+        if year:
+            if ":" in year:
+                parts = year.split(":")
+                if parts[0]:
+                    filters["year_from"] = int(parts[0])
+                if parts[1]:
+                    filters["year_to"] = int(parts[1])
+            else:
+                filters["year_from"] = int(year)
+                filters["year_to"] = int(year)
+        if author:
+            filters["author"] = author
+        if venue:
+            filters["venue"] = venue
+        if tag:
+            filters["tag"] = tag
+        if item_type:
+            filters["type"] = item_type
 
+        if q:
             try:
                 all_results = hybrid_search(
                     session,
@@ -97,6 +100,30 @@ def search_page(
                 )
             except Exception:
                 all_results = []
+        elif filters:
+            # Filter-only search (no query text): scan all items with filters
+            from app.core.models import Author, ItemAuthor, ItemTag
+
+            query_stmt = select(Item).where(Item.status == "active")
+            if filters.get("year_from"):
+                query_stmt = query_stmt.where(Item.year >= filters["year_from"])
+            if filters.get("year_to"):
+                query_stmt = query_stmt.where(Item.year <= filters["year_to"])
+            if filters.get("venue"):
+                query_stmt = query_stmt.where(Item.venue.icontains(filters["venue"]))
+            if filters.get("type"):
+                query_stmt = query_stmt.where(Item.type == filters["type"])
+            if filters.get("tag"):
+                query_stmt = query_stmt.join(ItemTag).join(Tag).where(Tag.name == filters["tag"])
+            if filters.get("author"):
+                author_q = filters["author"].lower()
+                query_stmt = (
+                    query_stmt.join(ItemAuthor).join(Author)
+                    .where(Author.norm_name.contains(author_q))
+                )
+            query_stmt = query_stmt.order_by(Item.year.desc().nulls_last(), Item.id.desc()).limit(500)
+            items_found = session.execute(query_stmt).scalars().all()
+            all_results = [{"item": it, "score": 0, "snippet": "", "matched_chunks": []} for it in items_found]
 
         total = len(all_results)
         total_pages = max(1, (total + per_page - 1) // per_page)
@@ -112,6 +139,7 @@ def search_page(
                 "request": request,
                 "query": q,
                 "results": results,
+                "author": author or "",
                 "year": year or "",
                 "venue": venue or "",
                 "tag": tag or "",
