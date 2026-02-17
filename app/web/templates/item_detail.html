@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}{{ item.title }} — Research Index{% endblock %}
+{% block title %}{{ item.title }} — Research Intelligence{% endblock %}
 {% block content %}
 <div style="margin-bottom: 0.5rem;">
     <a href="/search">&larr; 検索に戻る</a>
@@ -68,28 +68,103 @@
 </div>
 {% endfor %}
 
-{% if graph and (graph.cites or graph.cited_by) %}
-<h2>引用グラフ</h2>
-<div class="card">
-    {% if graph.cites %}
-    <h3>この論文が引用 ({{ graph.cites|length }}件)</h3>
-    <ul>
-    {% for c in graph.cites %}
-        <li><a href="/item/{{ c.id }}">{{ c.title }}</a> ({{ c.year or '?' }})</li>
-    {% endfor %}
-    </ul>
-    {% endif %}
-    {% if graph.cited_by %}
-    <h3>この論文を引用 ({{ graph.cited_by|length }}件)</h3>
-    <ul>
-    {% for c in graph.cited_by %}
-        <li><a href="/item/{{ c.id }}">{{ c.title }}</a> ({{ c.year or '?' }})</li>
-    {% endfor %}
-    </ul>
-    {% endif %}
-    <div style="margin-top: 0.5rem;">
-        <a href="/graph/{{ item.id }}" class="btn btn-secondary">グラフを表示</a>
+{% if graph %}
+<h2>引用関係</h2>
+<div class="card" style="margin-bottom: 1rem;">
+    <div style="display: flex; gap: 1rem; margin-bottom: 1rem;">
+        <button onclick="showTab('refs')" id="tab-refs" style="font-weight:bold; border-bottom: 2px solid #007bff;">References</button>
+        <button onclick="showTab('citedby')" id="tab-citedby">Cited by</button>
+        <button onclick="showTab('graph')" id="tab-graph">Graph</button>
     </div>
+
+    <div id="panel-refs">
+        {% if graph.cites %}
+        <h3>この論文が引用 ({{ graph.cites|length }}件)</h3>
+        <table style="width:100%; border-collapse:collapse; font-size:0.9em;">
+            <thead>
+                <tr style="border-bottom:2px solid #ddd;">
+                    <th style="text-align:left; padding:0.3rem;">タイトル</th>
+                    <th style="text-align:left; padding:0.3rem; width:60px;">年</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for c in graph.cites %}
+                <tr style="border-bottom:1px solid #eee;">
+                    <td style="padding:0.3rem;"><a href="/item/{{ c.id }}">{{ c.title }}</a></td>
+                    <td style="padding:0.3rem;">{{ c.year or '?' }}</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p class="meta">解決済み引用なし</p>
+        {% endif %}
+
+        {% if graph.unresolved_refs %}
+        <h3 style="margin-top:1rem;">未解決の参照 ({{ graph.unresolved_refs|length }}件)</h3>
+        <ul style="font-size:0.85em; color:#666;">
+        {% for ref in graph.unresolved_refs[:20] %}
+            <li>{{ ref.raw_cite }}{% if ref.dst_key %} <code>[{{ ref.dst_key }}]</code>{% endif %}</li>
+        {% endfor %}
+        {% if graph.unresolved_refs|length > 20 %}
+            <li>... 他 {{ graph.unresolved_refs|length - 20 }}件</li>
+        {% endif %}
+        </ul>
+        {% endif %}
+    </div>
+
+    <div id="panel-citedby" style="display:none;">
+        {% if graph.cited_by %}
+        <h3>この論文を引用 ({{ graph.cited_by|length }}件)</h3>
+        <table style="width:100%; border-collapse:collapse; font-size:0.9em;">
+            <thead>
+                <tr style="border-bottom:2px solid #ddd;">
+                    <th style="text-align:left; padding:0.3rem;">タイトル</th>
+                    <th style="text-align:left; padding:0.3rem; width:60px;">年</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for c in graph.cited_by %}
+                <tr style="border-bottom:1px solid #eee;">
+                    <td style="padding:0.3rem;"><a href="/item/{{ c.id }}">{{ c.title }}</a></td>
+                    <td style="padding:0.3rem;">{{ c.year or '?' }}</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p class="meta">被引用なし</p>
+        {% endif %}
+    </div>
+
+    <div id="panel-graph" style="display:none;">
+        <a href="/graph/{{ item.id }}" class="btn btn-secondary">グラフを表示</a>
+        <a href="/graph/{{ item.id }}?depth=2" class="btn btn-secondary">2ホップグラフ</a>
+    </div>
+</div>
+
+<script>
+function showTab(name) {
+    ['refs', 'citedby', 'graph'].forEach(function(t) {
+        document.getElementById('panel-' + t).style.display = t === name ? 'block' : 'none';
+        var tab = document.getElementById('tab-' + t);
+        tab.style.fontWeight = t === name ? 'bold' : 'normal';
+        tab.style.borderBottom = t === name ? '2px solid #007bff' : 'none';
+    });
+}
+</script>
+{% endif %}
+
+{% if matched_chunks %}
+<h2>マッチしたチャンク</h2>
+<div class="card">
+{% for mc in matched_chunks %}
+    <div style="margin-bottom: 0.5rem; padding: 0.5rem; background: #f8f9fa; border-left: 3px solid #007bff;">
+        <span class="badge" style="font-size: 0.75em;">{{ "%.3f"|format(mc.score) }}</span>
+        <span style="font-size: 0.8em; color: #888;">[chars {{ mc.start_char }}-{{ mc.end_char }}]</span>
+        <div style="margin-top: 0.3rem; font-size: 0.9em;">{{ mc.text }}</div>
+    </div>
+{% endfor %}
 </div>
 {% endif %}
 {% endblock %}

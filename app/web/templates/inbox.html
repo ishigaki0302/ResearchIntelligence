@@ -1,37 +1,71 @@
 {% extends "base.html" %}
-{% block title %}Inbox — Research Index{% endblock %}
+{% block title %}Inbox — Research Intelligence{% endblock %}
 {% block content %}
 <h1>Inbox</h1>
 
-<div class="filter-row" style="margin-bottom:1rem;">
+<div class="filter-row" style="margin-bottom:1rem; display:flex; gap:0.5rem; align-items:center;">
     <label>Status:</label>
     <a href="/inbox?status=new" class="btn {% if current_status == 'new' %}{% else %}btn-secondary{% endif %}" style="font-size:0.8rem; padding:0.3rem 0.6rem;">New</a>
+    <a href="/inbox?status=recommended" class="btn {% if current_status == 'recommended' %}{% else %}btn-secondary{% endif %}" style="font-size:0.8rem; padding:0.3rem 0.6rem;">Recommended</a>
     <a href="/inbox?status=accepted" class="btn btn-secondary" style="font-size:0.8rem; padding:0.3rem 0.6rem;">Accepted</a>
     <a href="/inbox?status=rejected" class="btn btn-secondary" style="font-size:0.8rem; padding:0.3rem 0.6rem;">Rejected</a>
     <a href="/inbox?status=all" class="btn btn-secondary" style="font-size:0.8rem; padding:0.3rem 0.6rem;">All</a>
+    <form method="post" action="/inbox/recommend" style="margin-left:auto;">
+        <button type="submit" class="btn btn-secondary" style="font-size:0.8rem; padding:0.3rem 0.6rem;">Run Recommend</button>
+    </form>
 </div>
 
 {% if inbox_items %}
 {% for it in inbox_items %}
 <div class="card">
-    <h3>{{ it.title }}</h3>
+    <h3>
+        {{ it.title }}
+        {% if it.recommended %}
+        <span class="badge" style="background:#28a745; color:white; font-size:0.7em; margin-left:0.3rem;">Recommended</span>
+        {% endif %}
+    </h3>
     <p class="meta">
         {{ it.source_id_type }}:{{ it.source_id_value }}
         | Year: {{ it.year or "?" }}
         {% if it.venue %}| {{ it.venue }}{% endif %}
         | Status: <span class="badge">{{ it.status }}</span>
+        {% if it.recommend_score is not none %}
+        | Score: {{ "%.2f"|format(it.recommend_score) }}
+        {% endif %}
     </p>
+    {% if it.recommended and it.reasons_json %}
+    <div style="font-size:0.85em; color:#28a745; margin-bottom:0.3rem;">
+        {% for reason in it.reasons_json | tojson | default('[]') %}{% endfor %}
+        {% set reasons = [] %}
+        {% if it.reasons_json %}
+            {% for r in it.reasons_json|replace('[','') |replace(']','')|replace('"','')|split(',') %}
+                {% if r.strip() %}<span class="badge" style="background:#e8f5e9; color:#2e7d32; font-size:0.8em;">{{ r.strip() }}</span> {% endif %}
+            {% endfor %}
+        {% endif %}
+    </div>
+    {% endif %}
     {% if it.abstract %}
     <p class="abstract">{{ it.abstract[:300] }}{% if it.abstract|length > 300 %}...{% endif %}</p>
     {% endif %}
     {% if it.status == "new" %}
-    <div style="display:flex; gap:0.5rem; margin-top:0.5rem;">
+    <div style="display:flex; gap:0.5rem; margin-top:0.5rem; align-items:center;">
         <form method="post" action="/inbox/{{ it.id }}/accept">
+            {% if it.auto_tags_json and it.auto_tags_json != '[]' %}
+            <input type="hidden" name="apply_tags" value="1">
+            {% endif %}
             <button type="submit" style="font-size:0.8rem; padding:0.3rem 0.6rem;">Accept</button>
         </form>
         <form method="post" action="/inbox/{{ it.id }}/reject">
             <button type="submit" class="btn-secondary" style="font-size:0.8rem; padding:0.3rem 0.6rem;">Reject</button>
         </form>
+        {% if it.auto_tags_json and it.auto_tags_json != '[]' %}
+        <span style="font-size:0.8em; color:#666;">
+            Auto-tags:
+            {% for tag in it.auto_tags_json|replace('[','') |replace(']','')|replace('"','')|split(',') %}
+                {% if tag.strip() %}<code>{{ tag.strip() }}</code> {% endif %}
+            {% endfor %}
+        </span>
+        {% endif %}
     </div>
     {% endif %}
 </div>

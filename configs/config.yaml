@@ -18,12 +18,18 @@ indexing:
   bm25_backend: "fts5"  # "fts5" or "whoosh"
   faiss_index_path: "data/cache/embeddings/faiss.index"
   faiss_id_map_path: "data/cache/embeddings/faiss_ids.json"
+  faiss_chunk_index_path: "data/cache/embeddings/faiss_chunks.index"
+  faiss_chunk_id_map_path: "data/cache/embeddings/faiss_chunks_ids.json"
+
+chunking:
+  target_size: 1000
+  overlap: 150
 
 download:
   max_workers: 4
   sleep_sec: 1.0
   timeout: 60
-  user_agent: "ResearchIndex/0.3"
+  user_agent: "ResearchIntelligence/0.4"
 
 external:
   openalex:

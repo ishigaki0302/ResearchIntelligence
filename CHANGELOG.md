@@ -6,6 +6,42 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-02-17
+
+### Added
+- **Chunk embeddings (P8)**: Fine-grained vector search over text chunks
+  - `Chunk` model for splitting item texts into searchable segments
+  - Heading-aware text chunking (`app/indexing/chunker.py`)
+  - Separate FAISS index for chunk embeddings
+  - `ri index --chunks` to build chunk index
+  - `ri search --scope both` to search items and chunks together
+  - Chunk hit preview in web search results and item detail
+- **Citation quality improvements (P9)**: Better reference extraction and resolution
+  - Multi-pattern reference extraction (bracket, numbered-dot, paragraph)
+  - Multi-ID extraction: DOI, arXiv, ACL Anthology, OpenReview, URL, ISBN
+  - Hash-based citation dedup (re-runnable without duplicates)
+  - Enhanced resolution: bibtex_key, DOI, arXiv, ACL, URL, title fallback
+  - Resolution stats with method breakdown
+  - Depth-2 citation subgraph support
+  - Tabbed References/Cited-by/Graph view on item detail
+  - Unresolved references shown on item detail
+- **Inbox automation (P10)**: Recommendation scoring and auto-tagging
+  - `ri inbox recommend` scores inbox items by relevance, venue, author overlap, recency
+  - Auto-tag suggestions from watch name, venue, and query keywords
+  - "Recommended" filter in web inbox
+  - Auto-tags applied on accept
+- **DevOps quality (P11)**: CI/CD hardening
+  - `CODEOWNERS` file
+  - Dependabot for pip and GitHub Actions
+  - Benchmark test in CI (warn-only)
+
+### Changed
+- `hybrid_search()` now accepts `scope` parameter: "item", "chunk", or "both"
+- `extract_references_for_item()` uses hash-based dedup instead of skip-all-if-any-exist
+- `resolve_citations()` returns detailed stats with method breakdown
+- `get_citation_subgraph()` includes `unresolved_refs` and supports `depth` parameter
+- Updated version to 0.4.0
+
 ## [0.3.0] - 2026-02-17
 
 ### Added

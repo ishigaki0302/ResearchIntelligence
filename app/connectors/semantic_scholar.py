@@ -25,7 +25,7 @@ def _cache_dir() -> Path:
 def _get_headers() -> dict:
     cfg = get_config()
     api_key = cfg.get("external", {}).get("semantic_scholar", {}).get("api_key", "")
-    headers = {"User-Agent": "ResearchIndex/0.2"}
+    headers = {"User-Agent": "ResearchIntelligence/0.4"}
     if api_key:
         headers["x-api-key"] = api_key
     return headers

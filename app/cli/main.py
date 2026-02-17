@@ -1,17 +1,14 @@
-"""CLI entry point for the research index (ri) tool."""
+"""CLI entry point for the research intelligence (ri) tool."""
 
 import logging
-import sys
 from pathlib import Path
 from typing import Optional
 
 import typer
 
-from app.core.config import REPO_ROOT
-
 app = typer.Typer(
     name="ri",
-    help="Research Index — local paper management CLI",
+    help="Research Intelligence — local paper management CLI",
     add_completion=False,
 )
 
@@ -40,7 +37,7 @@ def tag_add(
     tag_name: str = typer.Argument(..., help="Tag name (e.g. method/RAG)"),
 ):
     """Add a tag to an item."""
-    from app.core.db import init_db, get_session
+    from app.core.db import get_session, init_db
     from app.core.models import Item
     from app.core.service import add_tag_to_item
 
@@ -64,7 +61,7 @@ def tag_rm(
     tag_name: str = typer.Argument(..., help="Tag name to remove"),
 ):
     """Remove a tag from an item."""
-    from app.core.db import init_db, get_session
+    from app.core.db import get_session, init_db
     from app.core.models import Item
     from app.core.service import remove_tag_from_item
 
@@ -90,7 +87,7 @@ def tag_ls(
     item_id: int = typer.Argument(..., help="Item ID"),
 ):
     """List tags on an item."""
-    from app.core.db import init_db, get_session
+    from app.core.db import get_session, init_db
     from app.core.models import Item
     from app.core.service import list_tags_for_item
 
@@ -113,14 +110,16 @@ def tag_ls(
 
 @app.command("import")
 def import_cmd(
-    spec: str = typer.Argument(..., help="Import spec, e.g. acl:2024{main,findings}, bib:/path, pdf:/path, url:https://..."),
+    spec: str = typer.Argument(
+        ..., help="Import spec, e.g. acl:2024{main,findings}, bib:/path, pdf:/path, url:https://..."
+    ),
     title: Optional[str] = typer.Option(None, "--title", help="Title (for pdf/url imports)"),
     year: Optional[int] = typer.Option(None, "--year", help="Year (for pdf/url imports)"),
     item_type: str = typer.Option("blog", "--type", help="Item type for url imports"),
 ):
     """Import papers from various sources."""
     from app.core.db import init_db
-    from app.pipelines.importer import parse_import_spec, import_acl, import_bibtex, import_pdf, import_url
+    from app.pipelines.importer import import_acl, import_bibtex, import_pdf, import_url, parse_import_spec
 
     init_db()
 
@@ -129,7 +128,9 @@ def import_cmd(
     args = parsed["args"]
 
     if src_type == "acl":
-        typer.echo(f"Importing from ACL Anthology: {args['event'].upper()} {args['year']} volumes={args.get('volumes', 'all')}")
+        typer.echo(
+            f"Importing from ACL Anthology: {args['event'].upper()} {args['year']} volumes={args.get('volumes', 'all')}"
+        )
         result = import_acl(**args)
         typer.echo(f"Done: {result['imported']} imported, {result['skipped']} skipped, {result['total']} total")
         typer.echo(f"Collection: {result['collection']}")
@@ -142,12 +143,16 @@ def import_cmd(
     elif src_type == "pdf":
         typer.echo(f"Importing PDF: {args['path']}")
         result = import_pdf(args["path"], title=title, year=year)
-        typer.echo(f"{'Created' if result['created'] else 'Already exists'}: {result['title']} (id={result['item_id']})")
+        typer.echo(
+            f"{'Created' if result['created'] else 'Already exists'}: {result['title']} (id={result['item_id']})"
+        )
 
     elif src_type == "url":
         typer.echo(f"Importing URL: {args['url']}")
         result = import_url(args["url"], item_type=item_type, title=title, year=year)
-        typer.echo(f"{'Created' if result['created'] else 'Already exists'}: {result['title']} (id={result['item_id']})")
+        typer.echo(
+            f"{'Created' if result['created'] else 'Already exists'}: {result['title']} (id={result['item_id']})"
+        )
 
     else:
         typer.echo(f"Unknown import type: {src_type}", err=True)
@@ -155,11 +160,13 @@ def import_cmd(
 
 
 @app.command()
-def index():
+def index(
+    chunks: bool = typer.Option(False, "--chunks", help="Also chunk texts and build chunk FAISS index"),
+):
     """Rebuild search indices (FTS5 + FAISS)."""
-    from app.core.db import init_db, get_session
-    from app.pipelines.extract import extract_all
+    from app.core.db import get_session, init_db
     from app.indexing.engine import rebuild_index
+    from app.pipelines.extract import extract_all
 
     init_db()
     session = get_session()
@@ -169,8 +176,18 @@ def index():
         ext_result = extract_all(session)
         typer.echo(f"  Extracted: {ext_result['extracted']}, Failed: {ext_result['failed']}")
 
+        if chunks:
+            from app.indexing.chunker import chunk_all_items
+
+            typer.echo("Chunking item texts...")
+            chunk_result = chunk_all_items(session)
+            typer.echo(
+                f"  Chunked: {chunk_result['chunked']}, "
+                f"Skipped: {chunk_result['skipped']}, Failed: {chunk_result['failed']}"
+            )
+
         typer.echo("Building indices...")
-        rebuild_index(session)
+        rebuild_index(session, include_chunks=chunks)
         typer.echo("Index rebuild complete.")
     finally:
         session.close()
@@ -184,9 +201,10 @@ def search(
     venue: Optional[str] = typer.Option(None, "--venue", help="Venue filter"),
     tag: Optional[str] = typer.Option(None, "--tag", help="Tag filter"),
     item_type: Optional[str] = typer.Option(None, "--type", help="Item type filter"),
+    scope: str = typer.Option("item", "--scope", help="Search scope: item, chunk, or both"),
 ):
     """Search the paper index."""
-    from app.core.db import init_db, get_session
+    from app.core.db import get_session, init_db
     from app.indexing.engine import hybrid_search
 
     init_db()
@@ -209,7 +227,7 @@ def search(
         filters["type"] = item_type
 
     try:
-        results = hybrid_search(session, query, top_k=top_k, filters=filters if filters else None)
+        results = hybrid_search(session, query, top_k=top_k, filters=filters if filters else None, scope=scope)
 
         if not results:
             typer.echo("No results found.")
@@ -229,9 +247,15 @@ def search(
                 authors += " et al."
             typer.echo(f"[{i}] {item.title}")
             typer.echo(f"    Authors: {authors}")
-            typer.echo(f"    Year: {item.year or '?'} | Venue: {item.venue_instance or item.venue or '?'} | Score: {score:.3f}")
+            typer.echo(
+                f"    Year: {item.year or '?'} | Venue: {item.venue_instance or item.venue or '?'} | Score: {score:.3f}"
+            )
             if r.get("snippet"):
                 typer.echo(f"    Snippet: {r['snippet'][:200]}")
+            if r.get("matched_chunks"):
+                typer.echo(f"    Chunk hits: {len(r['matched_chunks'])}")
+                for mc in r["matched_chunks"][:2]:
+                    typer.echo(f"      [{mc['score']:.3f}] {mc['text'][:120]}...")
             typer.echo(f"    Key: {item.bibtex_key}")
             typer.echo()
     finally:
@@ -247,7 +271,7 @@ def export_bib(
     collection: Optional[str] = typer.Option(None, "--collection", help="Filter by collection name"),
 ):
     """Export items as a .bib file."""
-    from app.core.db import init_db, get_session
+    from app.core.db import get_session, init_db
     from app.pipelines.exporter import export_bibtex
 
     init_db()
@@ -284,10 +308,10 @@ def extract_references(
     item_id: Optional[int] = typer.Option(None, "--id", help="Process a single item"),
 ):
     """Extract references from paper text and create citation links."""
-    from app.core.db import init_db, get_session
+    from app.core.db import get_session, init_db
     from app.core.models import Item
-    from app.pipelines.references import extract_references_for_item, extract_all_references
     from app.graph.citations import resolve_citations
+    from app.pipelines.references import extract_all_references, extract_references_for_item
 
     init_db()
     session = get_session()
@@ -303,7 +327,9 @@ def extract_references(
             typer.echo(f"Extracted {len(entries)} references from: {item.title[:80]}")
         else:
             result = extract_all_references(session, limit=limit)
-            typer.echo(f"Done: {result['extracted']} items processed, {result['skipped']} skipped, {result['failed']} failed")
+            typer.echo(
+                f"Done: {result['extracted']} items processed, {result['skipped']} skipped, {result['failed']} failed"
+            )
 
         # Resolve citations
         typer.echo("Resolving citations...")
@@ -323,10 +349,12 @@ def download_pdf(
 ):
     """Download PDFs for items in the database."""
     import json
+
     from sqlalchemy import select
-    from app.core.db import init_db, get_session
+
+    from app.core.db import get_session, init_db
     from app.core.models import Collection, CollectionItem, Item, Job
-    from app.pipelines.downloader import download_pdfs, download_pdf_for_item
+    from app.pipelines.downloader import download_pdf_for_item, download_pdfs
 
     init_db()
     session = get_session()
@@ -354,9 +382,11 @@ def download_pdf(
 
         if failed_only:
             # Get item IDs from failed download jobs
-            failed_jobs = session.execute(
-                select(Job).where(Job.job_type == "download_pdf", Job.status == "failed")
-            ).scalars().all()
+            failed_jobs = (
+                session.execute(select(Job).where(Job.job_type == "download_pdf", Job.status == "failed"))
+                .scalars()
+                .all()
+            )
             failed_ids = []
             for job in failed_jobs:
                 payload = json.loads(job.payload_json) if job.payload_json else {}
@@ -372,15 +402,15 @@ def download_pdf(
             query = query.where(Item.pdf_path.is_(None))
 
         if collection:
-            coll = session.execute(
-                select(Collection).where(Collection.name == collection)
-            ).scalar_one_or_none()
+            coll = session.execute(select(Collection).where(Collection.name == collection)).scalar_one_or_none()
             if not coll:
                 typer.echo(f"Collection '{collection}' not found", err=True)
                 raise typer.Exit(1)
-            coll_item_ids = session.execute(
-                select(CollectionItem.item_id).where(CollectionItem.collection_id == coll.id)
-            ).scalars().all()
+            coll_item_ids = (
+                session.execute(select(CollectionItem.item_id).where(CollectionItem.collection_id == coll.id))
+                .scalars()
+                .all()
+            )
             query = query.where(Item.id.in_(coll_item_ids))
 
         items = session.execute(query).scalars().all()
@@ -394,6 +424,7 @@ def download_pdf(
 
         typer.echo(f"Downloading PDFs for {len(items)} items...")
         from app.core.config import get_config
+
         cfg = get_config()
         dl_cfg = cfg.get("download", {})
         sleep_sec = dl_cfg.get("sleep_sec", 1.0)
@@ -413,7 +444,8 @@ def enrich(
 ):
     """Enrich items with external IDs from OpenAlex and Semantic Scholar."""
     from sqlalchemy import select
-    from app.core.db import init_db, get_session
+
+    from app.core.db import get_session, init_db
     from app.core.models import Collection, CollectionItem, Item
     from app.pipelines.enricher import enrich_item, enrich_items
 
@@ -436,15 +468,15 @@ def enrich(
 
         query = select(Item)
         if collection:
-            coll = session.execute(
-                select(Collection).where(Collection.name == collection)
-            ).scalar_one_or_none()
+            coll = session.execute(select(Collection).where(Collection.name == collection)).scalar_one_or_none()
             if not coll:
                 typer.echo(f"Collection '{collection}' not found", err=True)
                 raise typer.Exit(1)
-            coll_item_ids = session.execute(
-                select(CollectionItem.item_id).where(CollectionItem.collection_id == coll.id)
-            ).scalars().all()
+            coll_item_ids = (
+                session.execute(select(CollectionItem.item_id).where(CollectionItem.collection_id == coll.id))
+                .scalars()
+                .all()
+            )
             query = query.where(Item.id.in_(coll_item_ids))
 
         items = session.execute(query).scalars().all()
@@ -472,6 +504,7 @@ def serve(
 ):
     """Start the web UI server."""
     import uvicorn
+
     from app.core.db import init_db
 
     init_db()
@@ -482,8 +515,9 @@ def serve(
 def stats():
     """Show database statistics."""
     from sqlalchemy import func, select
-    from app.core.db import init_db, get_session
-    from app.core.models import Item, Author, Note, Collection, Citation
+
+    from app.core.db import get_session, init_db
+    from app.core.models import Author, Citation, Collection, Item, Note
 
     init_db()
     session = get_session()
@@ -502,9 +536,7 @@ def stats():
         typer.echo(f"Citations:   {cite_count}")
 
         # Breakdown by type
-        type_counts = session.execute(
-            select(Item.type, func.count(Item.id)).group_by(Item.type)
-        ).all()
+        type_counts = session.execute(select(Item.type, func.count(Item.id)).group_by(Item.type)).all()
         if type_counts:
             typer.echo("\nBy type:")
             for t, c in type_counts:
@@ -535,7 +567,8 @@ def watch_add(
 ):
     """Add a new watch."""
     import json
-    from app.core.db import init_db, get_session
+
+    from app.core.db import get_session, init_db
     from app.core.models import Watch
 
     init_db()
@@ -562,7 +595,8 @@ def watch_add(
 def watch_list():
     """List all watches."""
     from sqlalchemy import select
-    from app.core.db import init_db, get_session
+
+    from app.core.db import get_session, init_db
     from app.core.models import Watch
 
     init_db()
@@ -587,8 +621,10 @@ def watch_run(
 ):
     """Run watches to discover new papers."""
     import re
+
     from sqlalchemy import select
-    from app.core.db import init_db, get_session
+
+    from app.core.db import get_session, init_db
     from app.core.models import Watch
     from app.pipelines.watch import run_watch
 
@@ -623,7 +659,8 @@ def inbox_list(
 ):
     """List inbox items."""
     from sqlalchemy import select
-    from app.core.db import init_db, get_session
+
+    from app.core.db import get_session, init_db
     from app.core.models import InboxItem
 
     init_db()
@@ -650,7 +687,7 @@ def inbox_accept(
     inbox_id: int = typer.Argument(..., help="Inbox item ID to accept"),
 ):
     """Accept an inbox item into the main library."""
-    from app.core.db import init_db, get_session
+    from app.core.db import get_session, init_db
     from app.core.models import InboxItem
     from app.pipelines.watch import accept_inbox_item
 
@@ -672,12 +709,29 @@ def inbox_accept(
         session.close()
 
 
+@inbox_app.command("recommend")
+def inbox_recommend(
+    threshold: float = typer.Option(0.6, "--threshold", help="Score threshold for recommendation"),
+):
+    """Score inbox items and mark recommendations."""
+    from app.core.db import get_session, init_db
+    from app.pipelines.inbox_recommend import recommend_inbox_items
+
+    init_db()
+    session = get_session()
+    try:
+        result = recommend_inbox_items(session, threshold=threshold)
+        typer.echo(f"Recommended: {result['recommended']}, Skipped: {result['skipped']}")
+    finally:
+        session.close()
+
+
 @inbox_app.command("reject")
 def inbox_reject(
     inbox_id: int = typer.Argument(..., help="Inbox item ID to reject"),
 ):
     """Reject an inbox item."""
-    from app.core.db import init_db, get_session
+    from app.core.db import get_session, init_db
     from app.core.models import InboxItem
 
     init_db()
@@ -700,14 +754,15 @@ def analytics_export(
 ):
     """Export trend analytics as JSON."""
     import json
-    from app.core.db import init_db, get_session
+
     from app.analytics.trends import (
-        items_by_year_venue,
         items_by_year_collection,
         items_by_year_tag,
-        watch_collection_growth,
+        items_by_year_venue,
         top_keyphrases_by_year,
+        watch_collection_growth,
     )
+    from app.core.db import get_session, init_db
 
     init_db()
     session = get_session()

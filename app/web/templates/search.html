@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}検索 — Research Index{% endblock %}
+{% block title %}検索 — Research Intelligence{% endblock %}
 {% block content %}
 <h1>検索</h1>
 
@@ -22,13 +22,19 @@
             <option value="blog" {% if item_type == 'blog' %}selected{% endif %}>Blog</option>
             <option value="slide" {% if item_type == 'slide' %}selected{% endif %}>Slide</option>
         </select>
+        <label>件数:</label>
+        <select name="per_page">
+            <option value="20" {% if per_page == 20 %}selected{% endif %}>20</option>
+            <option value="50" {% if per_page == 50 %}selected{% endif %}>50</option>
+            <option value="100" {% if per_page == 100 %}selected{% endif %}>100</option>
+        </select>
         <button type="submit">絞り込み</button>
     </form>
 </div>
 
 {% if query %}
 <div class="meta" style="margin-bottom: 1rem;">
-    "{{ query }}" の検索結果: {{ results|length }}件
+    "{{ query }}" の検索結果: {{ total }}件{% if total_pages > 1 %}（ページ {{ page }} / {{ total_pages }}）{% endif %}
 </div>
 {% endif %}
 
@@ -49,13 +55,49 @@
     {% elif item.abstract %}
     <div class="snippet">{{ item.abstract[:200] }}{% if item.abstract|length > 200 %}...{% endif %}</div>
     {% endif %}
+    {% if r.matched_chunks %}
+    <div style="margin-top: 0.5rem; padding: 0.5rem; background: #f8f9fa; border-left: 3px solid #007bff; font-size: 0.85em;">
+        <strong>チャンクヒット ({{ r.matched_chunks|length }}):</strong>
+        {% for mc in r.matched_chunks[:2] %}
+        <div style="margin-top: 0.3rem; color: #555;">
+            <span class="badge" style="font-size: 0.75em;">{{ "%.3f"|format(mc.score) }}</span>
+            {{ mc.text[:200] }}{% if mc.text|length > 200 %}...{% endif %}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
 </div>
 {% endif %}
 {% endfor %}
 
-{% if query and not results %}
+{% if query and not results and total == 0 %}
 <div class="card">
     <p>該当する結果が見つかりませんでした。別のクエリを試すか、<code>ri index</code> でインデックスを再構築してください。</p>
 </div>
+{% endif %}
+
+{% if query and total_pages > 1 %}
+<nav style="display:flex; justify-content:center; align-items:center; gap:0.5rem; margin:1.5rem 0;">
+    {% if page > 1 %}
+    <a href="/search?q={{ query|urlencode }}&page={{ page - 1 }}&per_page={{ per_page }}{% if year %}&year={{ year }}{% endif %}{% if venue %}&venue={{ venue }}{% endif %}{% if item_type %}&type={{ item_type }}{% endif %}"
+       class="btn btn-secondary" style="font-size:0.85rem; padding:0.3rem 0.8rem;">&larr; 前へ</a>
+    {% endif %}
+
+    {% for p in range(1, total_pages + 1) %}
+        {% if p == page %}
+        <span class="btn" style="font-size:0.85rem; padding:0.3rem 0.8rem;">{{ p }}</span>
+        {% elif p <= 3 or p >= total_pages - 1 or (p >= page - 2 and p <= page + 2) %}
+        <a href="/search?q={{ query|urlencode }}&page={{ p }}&per_page={{ per_page }}{% if year %}&year={{ year }}{% endif %}{% if venue %}&venue={{ venue }}{% endif %}{% if item_type %}&type={{ item_type }}{% endif %}"
+           class="btn btn-secondary" style="font-size:0.85rem; padding:0.3rem 0.8rem;">{{ p }}</a>
+        {% elif p == 4 or p == total_pages - 2 %}
+        <span style="color:var(--muted);">…</span>
+        {% endif %}
+    {% endfor %}
+
+    {% if page < total_pages %}
+    <a href="/search?q={{ query|urlencode }}&page={{ page + 1 }}&per_page={{ per_page }}{% if year %}&year={{ year }}{% endif %}{% if venue %}&venue={{ venue }}{% endif %}{% if item_type %}&type={{ item_type }}{% endif %}"
+       class="btn btn-secondary" style="font-size:0.85rem; padding:0.3rem 0.8rem;">次へ &rarr;</a>
+    {% endif %}
+</nav>
 {% endif %}
 {% endblock %}

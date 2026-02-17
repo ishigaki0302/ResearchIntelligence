@@ -8,19 +8,19 @@ from fastapi import FastAPI, Form, Query, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from sqlalchemy import select, func
+from sqlalchemy import func, select
 
 from app.core.config import resolve_path
 from app.core.db import get_session, init_db
-from app.core.models import Author, Citation, Collection, InboxItem, Item, ItemAuthor, ItemTag, Note, Tag, Watch
-from app.core.service import add_tag_to_item, remove_tag_from_item, list_tags_for_item
+from app.core.models import Collection, InboxItem, Item, Note, Tag, Watch
+from app.core.service import add_tag_to_item, list_tags_for_item, remove_tag_from_item
 from app.graph.citations import get_citation_subgraph
 from app.indexing.engine import hybrid_search
 
 TEMPLATES_DIR = Path(__file__).parent / "templates"
 STATIC_DIR = Path(__file__).parent / "static"
 
-app = FastAPI(title="Research Index")
+app = FastAPI(title="Research Intelligence")
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
 if STATIC_DIR.exists():
@@ -37,20 +37,19 @@ def home(request: Request):
     session = get_session()
     try:
         item_count = session.execute(select(func.count(Item.id))).scalar()
-        recent = session.execute(
-            select(Item).order_by(Item.created_at.desc()).limit(10)
-        ).scalars().all()
+        recent = session.execute(select(Item).order_by(Item.created_at.desc()).limit(10)).scalars().all()
 
-        collections = session.execute(
-            select(Collection).order_by(Collection.created_at.desc())
-        ).scalars().all()
+        collections = session.execute(select(Collection).order_by(Collection.created_at.desc())).scalars().all()
 
-        return templates.TemplateResponse("home.html", {
-            "request": request,
-            "item_count": item_count,
-            "recent_items": recent,
-            "collections": collections,
-        })
+        return templates.TemplateResponse(
+            "home.html",
+            {
+                "request": request,
+                "item_count": item_count,
+                "recent_items": recent,
+                "collections": collections,
+            },
+        )
     finally:
         session.close()
 
@@ -62,11 +61,12 @@ def search_page(
     year: Optional[str] = Query(None),
     venue: Optional[str] = Query(None),
     item_type: Optional[str] = Query(None, alias="type"),
-    top_k: int = Query(20),
+    page: int = Query(1, ge=1),
+    per_page: int = Query(20, ge=1, le=100),
 ):
     session = get_session()
     try:
-        results = []
+        all_results = []
         if q:
             filters = {}
             if year:
@@ -85,21 +85,37 @@ def search_page(
                 filters["type"] = item_type
 
             try:
-                results = hybrid_search(
-                    session, q, top_k=top_k,
+                all_results = hybrid_search(
+                    session,
+                    q,
+                    top_k=500,
                     filters=filters if filters else None,
+                    scope="both",
                 )
-            except Exception as e:
-                results = []
+            except Exception:
+                all_results = []
 
-        return templates.TemplateResponse("search.html", {
-            "request": request,
-            "query": q,
-            "results": results,
-            "year": year or "",
-            "venue": venue or "",
-            "item_type": item_type or "",
-        })
+        total = len(all_results)
+        total_pages = max(1, (total + per_page - 1) // per_page)
+        page = min(page, total_pages)
+        start = (page - 1) * per_page
+        results = all_results[start : start + per_page]
+
+        return templates.TemplateResponse(
+            "search.html",
+            {
+                "request": request,
+                "query": q,
+                "results": results,
+                "year": year or "",
+                "venue": venue or "",
+                "item_type": item_type or "",
+                "page": page,
+                "per_page": per_page,
+                "total": total,
+                "total_pages": total_pages,
+            },
+        )
     finally:
         session.close()
 
@@ -113,9 +129,7 @@ def item_detail(request: Request, item_id: int):
             return HTMLResponse("Item not found", status_code=404)
 
         # Get notes
-        notes = session.execute(
-            select(Note).where(Note.item_id == item_id)
-        ).scalars().all()
+        notes = session.execute(select(Note).where(Note.item_id == item_id)).scalars().all()
 
         note_contents = {}
         for note in notes:
@@ -131,14 +145,17 @@ def item_detail(request: Request, item_id: int):
         # Get citation subgraph
         graph = get_citation_subgraph(session, item_id)
 
-        return templates.TemplateResponse("item_detail.html", {
-            "request": request,
-            "item": item,
-            "notes": notes,
-            "note_contents": note_contents,
-            "tags": tags,
-            "graph": graph,
-        })
+        return templates.TemplateResponse(
+            "item_detail.html",
+            {
+                "request": request,
+                "item": item,
+                "notes": notes,
+                "note_contents": note_contents,
+                "tags": tags,
+                "graph": graph,
+            },
+        )
     finally:
         session.close()
 
@@ -162,17 +179,21 @@ def save_note(item_id: int, note_id: int, content: str = Form(...)):
 
 
 @app.get("/graph/{item_id}", response_class=HTMLResponse)
-def graph_view(request: Request, item_id: int):
+def graph_view(request: Request, item_id: int, depth: int = Query(1)):
     session = get_session()
     try:
-        graph = get_citation_subgraph(session, item_id)
+        graph = get_citation_subgraph(session, item_id, depth=depth)
         item = session.get(Item, item_id)
-        return templates.TemplateResponse("graph.html", {
-            "request": request,
-            "item": item,
-            "graph": graph,
-            "graph_json": json.dumps(graph),
-        })
+        return templates.TemplateResponse(
+            "graph.html",
+            {
+                "request": request,
+                "item": item,
+                "graph": graph,
+                "graph_json": json.dumps(graph),
+                "depth": depth,
+            },
+        )
     finally:
         session.close()
 
@@ -208,9 +229,7 @@ def suggest_tags(q: str = Query("")):
     try:
         if not q:
             return JSONResponse([])
-        tags = session.execute(
-            select(Tag).where(Tag.name.contains(q)).limit(10)
-        ).scalars().all()
+        tags = session.execute(select(Tag).where(Tag.name.contains(q)).limit(10)).scalars().all()
         return JSONResponse([t.name for t in tags])
     finally:
         session.close()
@@ -220,13 +239,14 @@ def suggest_tags(q: str = Query("")):
 def watches_page(request: Request):
     session = get_session()
     try:
-        watches = session.execute(
-            select(Watch).order_by(Watch.created_at.desc())
-        ).scalars().all()
-        return templates.TemplateResponse("watches.html", {
-            "request": request,
-            "watches": watches,
-        })
+        watches = session.execute(select(Watch).order_by(Watch.created_at.desc())).scalars().all()
+        return templates.TemplateResponse(
+            "watches.html",
+            {
+                "request": request,
+                "watches": watches,
+            },
+        )
     finally:
         session.close()
 
@@ -239,6 +259,7 @@ def create_watch(
     category: str = Form(""),
 ):
     import json as _json
+
     session = get_session()
     try:
         filters = {}
@@ -274,6 +295,7 @@ def toggle_watch(watch_id: int):
 @app.post("/watches/{watch_id}/run")
 def run_watch_web(watch_id: int):
     from app.pipelines.watch import run_watch
+
     session = get_session()
     try:
         watch = session.get(Watch, watch_id)
@@ -291,31 +313,53 @@ def inbox_page(request: Request, status: str = Query("new")):
     session = get_session()
     try:
         query = select(InboxItem).order_by(InboxItem.discovered_at.desc())
-        if status != "all":
+        if status == "recommended":
+            query = query.where(InboxItem.recommended.is_(True), InboxItem.status == "new")
+        elif status != "all":
             query = query.where(InboxItem.status == status)
         items = session.execute(query).scalars().all()
 
         watches = session.execute(select(Watch)).scalars().all()
 
-        return templates.TemplateResponse("inbox.html", {
-            "request": request,
-            "inbox_items": items,
-            "watches": watches,
-            "current_status": status,
-        })
+        return templates.TemplateResponse(
+            "inbox.html",
+            {
+                "request": request,
+                "inbox_items": items,
+                "watches": watches,
+                "current_status": status,
+            },
+        )
+    finally:
+        session.close()
+
+
+@app.post("/inbox/recommend")
+def recommend_inbox_web():
+    from app.pipelines.inbox_recommend import recommend_inbox_items
+
+    session = get_session()
+    try:
+        recommend_inbox_items(session)
+        return RedirectResponse("/inbox?status=recommended", status_code=303)
     finally:
         session.close()
 
 
 @app.post("/inbox/{inbox_id}/accept")
-def accept_inbox_web(inbox_id: int):
+def accept_inbox_web(inbox_id: int, apply_tags: str = Form("")):
     from app.pipelines.watch import accept_inbox_item
+
     session = get_session()
     try:
         inbox_item = session.get(InboxItem, inbox_id)
         if not inbox_item:
             return HTMLResponse("Inbox item not found", status_code=404)
-        accept_inbox_item(session, inbox_item)
+        item = accept_inbox_item(session, inbox_item)
+        if apply_tags and item:
+            from app.pipelines.inbox_recommend import apply_auto_tags_on_accept
+
+            apply_auto_tags_on_accept(session, inbox_item, item)
         session.commit()
         return RedirectResponse("/inbox", status_code=303)
     finally:
@@ -339,12 +383,13 @@ def reject_inbox_web(inbox_id: int):
 @app.get("/analytics", response_class=HTMLResponse)
 def analytics_page(request: Request):
     from app.analytics.trends import (
-        items_by_year_venue,
         items_by_year_collection,
         items_by_year_tag,
-        watch_collection_growth,
+        items_by_year_venue,
         top_keyphrases_by_year,
+        watch_collection_growth,
     )
+
     session = get_session()
     try:
         data = {
@@ -354,10 +399,13 @@ def analytics_page(request: Request):
             "watch_growth": watch_collection_growth(session),
             "keyphrases": top_keyphrases_by_year(session, top_n=15),
         }
-        return templates.TemplateResponse("analytics.html", {
-            "request": request,
-            "data": data,
-        })
+        return templates.TemplateResponse(
+            "analytics.html",
+            {
+                "request": request,
+                "data": data,
+            },
+        )
     finally:
         session.close()
 
@@ -366,12 +414,13 @@ def analytics_page(request: Request):
 def collections_list(request: Request):
     session = get_session()
     try:
-        collections = session.execute(
-            select(Collection).order_by(Collection.created_at.desc())
-        ).scalars().all()
-        return templates.TemplateResponse("collections.html", {
-            "request": request,
-            "collections": collections,
-        })
+        collections = session.execute(select(Collection).order_by(Collection.created_at.desc())).scalars().all()
+        return templates.TemplateResponse(
+            "collections.html",
+            {
+                "request": request,
+                "collections": collections,
+            },
+        )
     finally:
         session.close()

@@ -15,7 +15,7 @@ from app.core.config import resolve_path, get_config
 logger = logging.getLogger(__name__)
 
 OPENALEX_API = "https://api.openalex.org"
-DEFAULT_USER_AGENT = "ResearchIndex/0.3"
+DEFAULT_USER_AGENT = "ResearchIntelligence/0.4"
 
 
 def _cache_dir() -> Path:

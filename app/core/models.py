@@ -50,15 +50,18 @@ class Item(Base):
 
     # Relationships
     external_ids = relationship("ItemId", back_populates="item", cascade="all, delete-orphan")
-    author_links = relationship("ItemAuthor", back_populates="item", cascade="all, delete-orphan",
-                                order_by="ItemAuthor.position")
+    author_links = relationship(
+        "ItemAuthor", back_populates="item", cascade="all, delete-orphan", order_by="ItemAuthor.position"
+    )
     tag_links = relationship("ItemTag", back_populates="item", cascade="all, delete-orphan")
     notes = relationship("Note", back_populates="item", cascade="all, delete-orphan")
     collection_links = relationship("CollectionItem", back_populates="item", cascade="all, delete-orphan")
-    citations_out = relationship("Citation", foreign_keys="Citation.src_item_id",
-                                 back_populates="src_item", cascade="all, delete-orphan")
-    citations_in = relationship("Citation", foreign_keys="Citation.dst_item_id",
-                                back_populates="dst_item", cascade="all, delete-orphan")
+    citations_out = relationship(
+        "Citation", foreign_keys="Citation.src_item_id", back_populates="src_item", cascade="all, delete-orphan"
+    )
+    citations_in = relationship(
+        "Citation", foreign_keys="Citation.dst_item_id", back_populates="dst_item", cascade="all, delete-orphan"
+    )
 
     @property
     def authors(self) -> list["Author"]:
@@ -179,9 +182,30 @@ class Citation(Base):
     dst_key = Column(Text)
     context = Column(Text)
     source = Column(String(64))  # "bibtex", "note", "auto"
+    raw_cite_hash = Column(String(64))  # SHA256 of normalized raw_cite for dedup
 
     src_item = relationship("Item", foreign_keys=[src_item_id], back_populates="citations_out")
     dst_item = relationship("Item", foreign_keys=[dst_item_id], back_populates="citations_in")
+
+    __table_args__ = (UniqueConstraint("src_item_id", "raw_cite_hash", name="uq_citation_src_hash"),)
+
+
+class Chunk(Base):
+    """A text chunk from an item, used for fine-grained vector search."""
+
+    __tablename__ = "chunks"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    item_id = Column(Integer, ForeignKey("items.id", ondelete="CASCADE"), nullable=False)
+    chunk_index = Column(Integer, nullable=False)
+    text = Column(Text, nullable=False)
+    start_char = Column(Integer)
+    end_char = Column(Integer)
+    created_at = Column(DateTime, default=_utcnow)
+
+    item = relationship("Item", backref="chunks")
+
+    __table_args__ = (UniqueConstraint("item_id", "chunk_index", name="uq_chunk_item_index"),)
 
 
 class Watch(Base):
@@ -224,13 +248,15 @@ class InboxItem(Base):
     status = Column(String(16), nullable=False, default="new")  # new/accepted/rejected
     accepted_item_id = Column(Integer, ForeignKey("items.id", ondelete="SET NULL"), nullable=True)
     dedup_hash = Column(String(64), index=True)
+    recommended = Column(Boolean, default=False)
+    recommend_score = Column(Float)
+    reasons_json = Column(Text)  # JSON list of reason strings
+    auto_tags_json = Column(Text)  # JSON list of suggested tag strings
 
     watch = relationship("Watch", back_populates="inbox_items")
     accepted_item = relationship("Item")
 
-    __table_args__ = (
-        UniqueConstraint("source_id_type", "source_id_value", name="uq_inbox_source_id"),
-    )
+    __table_args__ = (UniqueConstraint("source_id_type", "source_id_value", name="uq_inbox_source_id"),)
 
 
 class Job(Base):

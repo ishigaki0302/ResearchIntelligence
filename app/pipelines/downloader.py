@@ -15,7 +15,7 @@ from app.core.models import Item, ItemId, Job
 logger = logging.getLogger(__name__)
 
 DEFAULT_TIMEOUT = 60
-DEFAULT_USER_AGENT = "ResearchIndex/0.2"
+DEFAULT_USER_AGENT = "ResearchIntelligence/0.4"
 
 
 def _get_download_config() -> dict:

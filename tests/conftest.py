@@ -18,6 +18,7 @@ def tmp_db(tmp_path):
 
     # Patch config to use tmp_path
     import app.core.config as cfg_mod
+
     original_root = cfg_mod.REPO_ROOT
 
     # Override resolve_path for testing
@@ -48,10 +49,17 @@ def tmp_db(tmp_path):
             "bm25_backend": "fts5",
             "faiss_index_path": "data/cache/embeddings/faiss.index",
             "faiss_id_map_path": "data/cache/embeddings/faiss_ids.json",
+            "faiss_chunk_index_path": "data/cache/embeddings/faiss_chunks.index",
+            "faiss_chunk_id_map_path": "data/cache/embeddings/faiss_chunks_ids.json",
+        },
+        "chunking": {
+            "target_size": 1000,
+            "overlap": 150,
         },
         "search": {"default_top_k": 20, "bm25_weight": 0.5, "vector_weight": 0.5},
     }
     import app.core.config as config_mod
+
     config_mod.get_config._cache = test_config
 
     init_db(db_path)

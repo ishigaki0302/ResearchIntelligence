@@ -34,7 +34,7 @@ def extract_url_text(url: str) -> tuple[str, str | None]:
     import requests
     from readability import Document
 
-    resp = requests.get(url, timeout=30, headers={"User-Agent": "ResearchIndex/0.1"})
+    resp = requests.get(url, timeout=30, headers={"User-Agent": "ResearchIntelligence/0.4"})
     resp.raise_for_status()
     doc = Document(resp.text)
     title = doc.title()

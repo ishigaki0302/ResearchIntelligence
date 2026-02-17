@@ -1,4 +1,4 @@
-# Research Index (ri) — v0.3
+# Research Intelligence (ri) — v0.4
 
 ローカル論文管理 + 検索 + 可視化システム。LaTeX/BibTeX ワークフロー向け。
 
@@ -7,11 +7,20 @@
 - **統合インポート**: ACL Anthology（一括）、BibTeX、PDF、URL
 - **冪等な取り込み**: 同じ論文を2回インポートしても重複なし
 - **ハイブリッド検索**: BM25（SQLite FTS5）+ ベクトル類似度（FAISS + sentence-transformers）
+- **チャンク検索**: テキストをチャンク分割 → チャンク単位のベクトル検索で精密ヒット
 - **BibTeX エクスポート**: venue/year/tag/collection でフィルタ → `.bib` 出力
 - **ノート**: 論文ごとに Markdown ノートを自動生成、Web UI で編集可能
-- **引用グラフ**: ローカルサブグラフの可視化（D3.js）
+- **引用グラフ**: ローカルサブグラフの可視化（D3.js）、References/Cited-by テーブル表示
+- **Inbox レコメンド**: スコアリングによる推薦 + 自動タグ付与
 - **Web UI**: FastAPI + Jinja2 + HTMX
 - **CLI**: `ri` コマンド（Typer）
+
+### v0.4 の新機能
+
+- **チャンク埋め込み (P8)**: テキストをチャンク分割 → チャンク FAISS インデックスでピンポイント検索
+- **引用品質向上 (P9)**: 多パターン参照抽出、タイトルフォールバック解決、References/Cited-by テーブル
+- **Inbox 自動化 (P10)**: スコアリングによる推薦、自動タグ提案
+- **DevOps 強化 (P11)**: CODEOWNERS、Dependabot、ベンチマークテスト
 
 ### v0.3 の新機能
 
@@ -65,16 +74,24 @@ ri import url:https://example.com/blog-post --type blog
 ### 3. 検索インデックス構築
 
 ```bash
+# 基本インデックス（FTS5 + FAISS）
 ri index
+
+# チャンクインデックスも構築（v0.4 新機能）
+ri index --chunks
 ```
 
 テキスト抽出（PDF/URL）→ FTS5 全文索引 → FAISS ベクトル埋め込みを構築します。
+`--chunks` を指定すると、テキストをチャンク分割して細粒度ベクトル検索も可能にします。
 
 ### 4. 検索
 
 ```bash
 # 基本検索
 ri search "instruction tuning in long context"
+
+# チャンクも含めて検索（v0.4 新機能）
+ri search "attention mechanism" --scope both
 
 # フィルタ付き
 ri search "retrieval augmented generation" --year 2024 --venue ACL -k 10
@@ -172,6 +189,9 @@ ri inbox reject 2
 
 # 全ステータス表示
 ri inbox list --status all
+
+# Inbox レコメンド（v0.4 新機能）
+ri inbox recommend --threshold 0.6
 ```
 
 ### 12. トレンド分析（v0.3 新機能）
@@ -239,13 +259,15 @@ repo/
 │   │   ├── exporter.py         # BibTeX エクスポート
 │   │   ├── extract.py          # テキスト抽出（PDF/URL）
 │   │   ├── downloader.py       # PDF ダウンロード
-│   │   ├── references.py       # 参照抽出
+│   │   ├── references.py       # 参照抽出（多パターン対応 v0.4）
 │   │   ├── enricher.py         # 外部 API エンリッチ
-│   │   └── watch.py            # ウォッチパイプライン（v0.3）
+│   │   ├── watch.py            # ウォッチパイプライン（v0.3）
+│   │   └── inbox_recommend.py  # Inbox レコメンド（v0.4）
 │   ├── analytics/
 │   │   └── trends.py           # トレンド分析（v0.3）
 │   ├── indexing/
-│   │   └── engine.py           # FTS5 + FAISS インデックス
+│   │   ├── engine.py           # FTS5 + FAISS インデックス
+│   │   └── chunker.py          # テキストチャンク分割（v0.4）
 │   └── graph/
 │       └── citations.py        # 引用グラフクエリ
 ├── .github/
@@ -305,7 +327,7 @@ watch:
 ## テスト
 
 ```bash
-pytest tests/ -v          # 全テスト実行（51件）
+pytest tests/ -v          # 全テスト実行
 ruff check app/ tests/    # Lint
 black --check app/ tests/ # フォーマットチェック
 ```

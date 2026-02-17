@@ -3,8 +3,8 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "research-index"
-version = "0.3.0"
+name = "research-intelligence"
+version = "0.4.0"
 description = "Local paper/article management + search + visualization system"
 requires-python = ">=3.11"
 dependencies = [

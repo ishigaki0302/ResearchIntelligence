@@ -35,3 +35,7 @@ jobs:
 
       - name: Run tests
         run: pytest tests/ -v --tb=short
+
+      - name: Run benchmarks (warn-only)
+        run: pytest tests/test_benchmark.py -v --tb=short -W default
+        continue-on-error: true
