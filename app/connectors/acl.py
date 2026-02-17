@@ -15,8 +15,8 @@ from typing import Any
 
 import requests
 
-from app.core.bibtex import parse_bibtex_string, parse_author_string
-from app.core.config import resolve_path, get_config
+from app.core.bibtex import parse_author_string, parse_bibtex_string
+from app.core.config import get_config, resolve_path
 
 logger = logging.getLogger(__name__)
 
@@ -139,21 +139,23 @@ def parse_acl_entries(bib_text: str, event: str, year: int, volume_type: str) ->
 
         venue_instance = f"{event.upper()} {entry_year}"
 
-        results.append({
-            "title": title,
-            "authors": authors,
-            "year": entry_year,
-            "venue": event.upper(),
-            "venue_instance": venue_instance,
-            "abstract": abstract,
-            "source_url": url,
-            "pdf_url": pdf_url,
-            "acl_id": acl_id,
-            "doi": doi,
-            "bibtex_key": acl_id,
-            "bibtex_raw": _entry_to_bib_str(entry),
-            "volume_type": volume_type,
-        })
+        results.append(
+            {
+                "title": title,
+                "authors": authors,
+                "year": entry_year,
+                "venue": event.upper(),
+                "venue_instance": venue_instance,
+                "abstract": abstract,
+                "source_url": url,
+                "pdf_url": pdf_url,
+                "acl_id": acl_id,
+                "doi": doi,
+                "bibtex_key": acl_id,
+                "bibtex_raw": _entry_to_bib_str(entry),
+                "volume_type": volume_type,
+            }
+        )
 
     return results
 

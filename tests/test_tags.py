@@ -1,7 +1,7 @@
 """Tests for tag management."""
 
 from app.core.models import Item
-from app.core.service import add_tag_to_item, remove_tag_from_item, list_tags_for_item
+from app.core.service import add_tag_to_item, list_tags_for_item, remove_tag_from_item
 
 
 def test_add_tag(tmp_db):

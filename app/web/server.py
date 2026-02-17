@@ -399,11 +399,32 @@ def analytics_page(request: Request):
             "watch_growth": watch_collection_growth(session),
             "keyphrases": top_keyphrases_by_year(session, top_n=15),
         }
+
+        # Clustering (catch errors gracefully)
+        cluster_data = None
+        try:
+            from app.analytics.clustering import cluster_items
+
+            cluster_data = cluster_items(session, n_clusters=5)
+        except Exception:
+            pass
+
+        # Citation network
+        network_data = None
+        try:
+            from app.analytics.network import analyze_citation_network
+
+            network_data = analyze_citation_network(session)
+        except Exception:
+            pass
+
         return templates.TemplateResponse(
             "analytics.html",
             {
                 "request": request,
                 "data": data,
+                "cluster_data": cluster_data,
+                "network_data": network_data,
             },
         )
     finally:

@@ -3,6 +3,86 @@
 {% block content %}
 <h1>Analytics</h1>
 
+<h2>Cluster Overview</h2>
+{% if cluster_data and cluster_data.clusters %}
+<p class="meta">{{ cluster_data.total_items }} items in {{ cluster_data.n_clusters }} clusters</p>
+{% for c in cluster_data.clusters %}
+<div class="card" style="margin-bottom:1rem;">
+    <h3>Cluster {{ c.id }} ({{ c.size }} items)</h3>
+    <p><strong>Topics:</strong>
+    {% for t in c.top_terms[:5] %}
+        <span class="badge" style="margin:0.15rem;">{{ t }}</span>
+    {% endfor %}
+    </p>
+    <p><strong>Representative papers:</strong></p>
+    <ul>
+    {% for item in c.representative_items[:3] %}
+        <li><a href="/item/{{ item.id }}">{{ item.title }}</a>
+            {% if item.year %}<span class="meta">[{{ item.year }}]</span>{% endif %}
+            {% if item.venue %}<span class="meta">({{ item.venue }})</span>{% endif %}
+        </li>
+    {% endfor %}
+    </ul>
+</div>
+{% endfor %}
+{% else %}
+<p class="meta">Not enough data for clustering.</p>
+{% endif %}
+
+<h2>Influential Papers (Citation Network)</h2>
+{% if network_data and network_data.node_count > 0 %}
+<p class="meta">{{ network_data.node_count }} nodes, {{ network_data.edge_count }} edges</p>
+
+<h3>Top Cited (In-degree)</h3>
+<table class="card" style="width:100%; border-collapse:collapse;">
+    <tr style="border-bottom:1px solid var(--border);">
+        <th style="text-align:left; padding:0.5rem;">Paper</th>
+        <th style="text-align:right; padding:0.5rem;">Citations</th>
+    </tr>
+    {% for item in network_data.top_in_degree[:10] %}
+    <tr style="border-bottom:1px solid var(--border);">
+        <td style="padding:0.5rem;"><a href="/item/{{ item.id }}">{{ item.title[:80] }}</a>
+            {% if item.year %}<span class="meta">[{{ item.year }}]</span>{% endif %}
+        </td>
+        <td style="text-align:right; padding:0.5rem;">{{ item.in_degree }}</td>
+    </tr>
+    {% endfor %}
+</table>
+
+{% if network_data.top_pagerank %}
+<h3>Top PageRank</h3>
+<table class="card" style="width:100%; border-collapse:collapse;">
+    <tr style="border-bottom:1px solid var(--border);">
+        <th style="text-align:left; padding:0.5rem;">Paper</th>
+        <th style="text-align:right; padding:0.5rem;">PageRank</th>
+    </tr>
+    {% for item in network_data.top_pagerank[:10] %}
+    <tr style="border-bottom:1px solid var(--border);">
+        <td style="padding:0.5rem;"><a href="/item/{{ item.id }}">{{ item.title[:80] }}</a></td>
+        <td style="text-align:right; padding:0.5rem;">{{ "%.4f"|format(item.pagerank) }}</td>
+    </tr>
+    {% endfor %}
+</table>
+{% endif %}
+
+{% if network_data.communities %}
+<h3>Communities ({{ network_data.community_count }} detected)</h3>
+{% for comm in network_data.communities[:5] %}
+<div class="card" style="margin-bottom:0.5rem;">
+    <strong>Community {{ comm.id }}</strong> ({{ comm.size }} papers)
+    <ul>
+    {% for m in comm.top_members[:3] %}
+        <li><a href="/item/{{ m.id }}">{{ m.title[:70] }}</a> <span class="meta">(cited: {{ m.in_degree }})</span></li>
+    {% endfor %}
+    </ul>
+</div>
+{% endfor %}
+{% endif %}
+
+{% else %}
+<p class="meta">No citation data available.</p>
+{% endif %}
+
 <h2>Year x Venue</h2>
 {% if data.year_venue %}
 <table class="card" style="width:100%; border-collapse:collapse;">

@@ -9,7 +9,7 @@ import requests
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.config import resolve_path, get_config
+from app.core.config import get_config, resolve_path
 from app.core.models import Item, ItemId, Job
 
 logger = logging.getLogger(__name__)

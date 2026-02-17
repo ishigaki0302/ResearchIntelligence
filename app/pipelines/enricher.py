@@ -8,16 +8,13 @@ from sqlalchemy.orm import Session
 
 from app.core.config import get_config
 from app.core.models import Item, ItemId
-from app.core.service import find_item_by_external_id
 
 logger = logging.getLogger(__name__)
 
 
 def _get_item_ext_ids(session: Session, item: Item) -> dict[str, str]:
     """Get existing external IDs for an item as a dict."""
-    links = session.execute(
-        select(ItemId).where(ItemId.item_id == item.id)
-    ).scalars().all()
+    links = session.execute(select(ItemId).where(ItemId.item_id == item.id)).scalars().all()
     return {link.id_type: link.id_value for link in links}
 
 
@@ -49,8 +46,9 @@ def enrich_item(session: Session, item: Item, update_metadata: bool = False) -> 
     s2_cfg = cfg.get("external", {}).get("semantic_scholar", {})
     if s2_cfg.get("enabled", False):
         from app.connectors.semantic_scholar import (
-            lookup_s2_by_doi, lookup_s2_by_arxiv, search_s2_by_title,
             extract_ids_from_s2,
+            lookup_s2_by_arxiv,
+            lookup_s2_by_doi,
         )
 
         s2_paper = None
@@ -77,7 +75,9 @@ def enrich_item(session: Session, item: Item, update_metadata: bool = False) -> 
     oa_cfg = cfg.get("external", {}).get("openalex", {})
     if not source and oa_cfg.get("enabled", False):
         from app.connectors.openalex import (
-            search_openalex, score_match, extract_ids_from_openalex,
+            extract_ids_from_openalex,
+            score_match,
+            search_openalex,
         )
 
         candidates = search_openalex(

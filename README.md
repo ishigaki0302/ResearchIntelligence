@@ -1,4 +1,4 @@
-# Research Intelligence (ri) — v0.4
+# Research Intelligence (ri) — v0.5
 
 ローカル論文管理 + 検索 + 可視化システム。LaTeX/BibTeX ワークフロー向け。
 
@@ -12,8 +12,19 @@
 - **ノート**: 論文ごとに Markdown ノートを自動生成、Web UI で編集可能
 - **引用グラフ**: ローカルサブグラフの可視化（D3.js）、References/Cited-by テーブル表示
 - **Inbox レコメンド**: スコアリングによる推薦 + 自動タグ付与
+- **定期同期 (sync)**: watch + recommend をまとめて実行（ローカル cron / GitHub Actions 対応）
+- **週次ダイジェスト**: 新着・推薦・キーフレーズの Markdown レポート自動生成
+- **高度な分析**: トピッククラスタリング（TF-IDF + KMeans）+ 引用ネットワーク分析（PageRank、コミュニティ検出）
+- **バックアップ/マイグレーション**: DB + データの zip バックアップ、スキーマバージョン管理
 - **Web UI**: FastAPI + Jinja2 + HTMX
 - **CLI**: `ri` コマンド（Typer）
+
+### v0.5 の新機能
+
+- **定期同期 (P12)**: `ri sync run` で watch + recommend をパイプライン実行。GitHub Actions ワークフロー付き
+- **週次ダイジェスト (P13)**: `ri digest weekly` で Markdown + JSON レポート生成
+- **高度な分析 (P14)**: トピッククラスタリング + 引用ネットワーク分析（PageRank、コミュニティ検出）
+- **運用品質 (P15)**: `ri backup create` / `ri migrate` / ジョブサマリ
 
 ### v0.4 の新機能
 
@@ -28,14 +39,6 @@
 - **Inbox**: 発見した論文の承認/却下ワークフロー
 - **トレンド分析**: 年×venue、年×tag、キーフレーズ抽出（TF-IDF）
 - **GitHub Actions CI**: pytest + ruff + black の自動チェック
-- **タグ付きリリース**: タグ push で GitHub Release を自動作成
-
-### v0.2 の機能
-
-- **PDF ダウンロード**: ACL Anthology 等からの一括ダウンロード
-- **参照抽出**: 論文テキストから引用関係を抽出 → 引用グラフ構築
-- **タグ管理**: CLI / Web UI でのタグ追加・削除
-- **外部 API 連携**: OpenAlex / Semantic Scholar からの ID 付与
 
 ## セットアップ
 
@@ -51,159 +54,125 @@ pip install -e ".[dev]"
 ### 1. ACL 2024 論文をインポート
 
 ```bash
-# main + findings トラックをインポート
 ri import "acl:2024{main,findings}"
-
-# 統計確認
 ri stats
 ```
 
-### 2. その他のインポート
+### 2. 検索インデックス構築
 
 ```bash
-# BibTeX ファイル
-ri import bib:/path/to/references.bib
-
-# 単体 PDF
-ri import pdf:/path/to/paper.pdf --title "My Paper" --year 2024
-
-# URL（ブログ等）
-ri import url:https://example.com/blog-post --type blog
+ri index           # 基本インデックス（FTS5 + FAISS）
+ri index --chunks  # チャンクインデックスも構築
 ```
 
-### 3. 検索インデックス構築
+### 3. 検索
 
 ```bash
-# 基本インデックス（FTS5 + FAISS）
-ri index
-
-# チャンクインデックスも構築（v0.4 新機能）
-ri index --chunks
-```
-
-テキスト抽出（PDF/URL）→ FTS5 全文索引 → FAISS ベクトル埋め込みを構築します。
-`--chunks` を指定すると、テキストをチャンク分割して細粒度ベクトル検索も可能にします。
-
-### 4. 検索
-
-```bash
-# 基本検索
 ri search "instruction tuning in long context"
-
-# チャンクも含めて検索（v0.4 新機能）
 ri search "attention mechanism" --scope both
-
-# フィルタ付き
 ri search "retrieval augmented generation" --year 2024 --venue ACL -k 10
 ```
 
-### 5. BibTeX エクスポート
+### 4. ウォッチリスト + Inbox
 
 ```bash
-# 全件エクスポート
-ri export-bib -o references.bib
-
-# venue + year でフィルタ
-ri export-bib --venue ACL --year 2024 -o acl2024.bib
-
-# コレクション指定
-ri export-bib --collection "ACL 2024" -o acl2024.bib
-```
-
-### 6. PDF ダウンロード
-
-```bash
-# コレクション単位でダウンロード
-ri download-pdf --collection "ACL 2024 (main,findings)" --max 10
-
-# 単体ダウンロード
-ri download-pdf --id 42
-
-# 失敗分のリトライ
-ri download-pdf --failed-only
-```
-
-### 7. 参照抽出
-
-```bash
-# テキスト/PDF のある全アイテムから参照を抽出
-ri extract-references --limit 50
-
-# 単体
-ri extract-references --id 42
-```
-
-References セクションを解析し、DOI/arXiv ID を抽出して引用リンクを作成します。
-
-### 8. タグ管理
-
-```bash
-ri tag add 1 method/RAG    # タグ追加
-ri tag ls 1                 # タグ一覧
-ri tag rm 1 method/RAG     # タグ削除
-```
-
-Web UI のアイテム詳細ページからも操作できます。
-
-### 9. 外部 API エンリッチ
-
-```bash
-# OpenAlex / Semantic Scholar の ID を付与
-ri enrich --limit 10
-
-# 単体
-ri enrich --id 42
-
-# メタデータも更新
-ri enrich --limit 10 --update-metadata
-```
-
-### 10. ウォッチリスト（v0.3 新機能）
-
-```bash
-# ウォッチを作成
 ri watch add --name rag-papers --source arxiv --query "retrieval augmented generation" --category cs.CL
-
-# ウォッチ一覧
-ri watch list
-
-# ウォッチを実行（直近7日の論文を取得）
 ri watch run --name rag-papers --since 7d
-
-# OpenAlex ソースのウォッチ
-ri watch add --name transformers-oa --source openalex --query "transformer language model"
-ri watch run
-```
-
-### 11. Inbox で論文をレビュー（v0.3 新機能）
-
-```bash
-# 新着 inbox を確認
-ri inbox list
-
-# 承認 → メインライブラリに追加
-ri inbox accept 1
-
-# 却下
-ri inbox reject 2
-
-# 全ステータス表示
-ri inbox list --status all
-
-# Inbox レコメンド（v0.4 新機能）
 ri inbox recommend --threshold 0.6
+ri inbox list
+ri inbox accept 1
 ```
 
-### 12. トレンド分析（v0.3 新機能）
+### 5. 定期同期（v0.5 新機能）
 
 ```bash
+# watch run + inbox recommend を一括実行
+ri sync run --since 7d --recommend --out digest.md
+
+# 直近のジョブ確認
+ri sync status
+
+# 最新ダイジェスト表示
+ri sync digest
+```
+
+cron で定期実行する場合:
+```bash
+# crontab -e
+0 6 * * 1 cd /path/to/repo && .venv/bin/ri sync run --since 7d --out data/cache/sync/digest.md
+```
+
+GitHub Actions では `.github/workflows/sync.yml` が schedule + workflow_dispatch で動作し、
+ダイジェストを Artifacts としてアップロードします（DB をコミットしない方式）。
+
+### 6. 週次ダイジェスト（v0.5 新機能）
+
+```bash
+# 直近7日のダイジェスト生成
+ri digest weekly --since 7d --out digest.md
+
+# 特定ウォッチのダイジェスト
+ri digest watch --name rag-papers --since 14d
+```
+
+出力例:
+```markdown
+# Research Intelligence Digest — Last 7 days
+## Summary
+| Metric | Count |
+|--------|-------|
+| Discovered | 42 |
+| Recommended | 8 |
+| Accepted | 3 |
+## By Watch
+### rag-papers
+Discovered: 25 | Recommended: 5 | Accepted: 2
+**Top recommended:**
+1. Paper Title (ACL) [2024] score=0.85
+...
+## Top Keywords
+- **retrieval augmented** (3.24)
+- **language model** (2.87)
+```
+
+### 7. 高度な分析（v0.5 新機能）
+
+```bash
+# トピッククラスタリング
+ri analytics cluster --clusters 5
+
+# 引用ネットワーク分析
+ri analytics graph-stats
+
 # 分析結果を JSON でエクスポート
 ri analytics export --out trends.json
 ```
 
-Web UI の `/analytics` ページでも確認できます（年×venue、年×tag、キーフレーズ等）。
+Web UI の `/analytics` ページでも確認できます。クラスタ概要、影響力の高い論文（PageRank）、
+コミュニティ検出結果が表示されます。
 
-### 13. Web UI
+### 8. バックアップとマイグレーション（v0.5 新機能）
+
+```bash
+# バックアップ作成
+ri backup create --out backup.zip
+ri backup create --out backup.zip --no-pdf --no-cache  # 軽量版
+
+# バックアップ復元手順を確認
+ri backup restore backup.zip
+
+# DBマイグレーション（スキーマ更新後に実行）
+ri migrate
+```
+
+### 9. BibTeX エクスポート
+
+```bash
+ri export-bib -o references.bib
+ri export-bib --venue ACL --year 2024 -o acl2024.bib
+```
+
+### 10. Web UI
 
 ```bash
 ri serve
@@ -217,21 +186,22 @@ ri serve
 - **グラフ**: 引用サブグラフ可視化（D3.js）
 - **Inbox**: 発見した論文の承認/却下
 - **Watches**: ウォッチの管理・実行
-- **分析**: トレンドダッシュボード
+- **分析**: トレンド + クラスタ + 引用ネットワーク
 
 ### エンドツーエンド ワークフロー
 
 ```bash
-ri import "acl:2024{main,findings}"                              # インポート
-ri download-pdf --collection "ACL 2024 (main,findings)" --max 100 # PDF ダウンロード
-ri index                                                          # 検索インデックス構築
-ri extract-references --limit 100                                  # 参照抽出 → 引用グラフ
-ri enrich --limit 100                                              # 外部 ID 付与
-ri watch add --name rag --source arxiv --query "RAG" --category cs.CL  # ウォッチ設定
-ri watch run                                                       # 新着論文取得
-ri inbox list                                                      # Inbox 確認
-ri analytics export --out trends.json                              # トレンド分析
-ri serve                                                           # Web UI 起動
+ri import "acl:2024{main,findings}"                  # インポート
+ri download-pdf --collection "ACL 2024 (main,findings)" --max 100
+ri index --chunks                                     # 検索インデックス構築
+ri extract-references --limit 100                     # 参照抽出
+ri enrich --limit 100                                 # 外部 ID 付与
+ri watch add --name rag --source arxiv --query "RAG" --category cs.CL
+ri sync run --since 7d --out digest.md                # 同期 + ダイジェスト
+ri analytics cluster                                  # トピック分析
+ri analytics graph-stats                              # 引用ネットワーク
+ri backup create --out backup.zip                     # バックアップ
+ri serve                                              # Web UI 起動
 ```
 
 ## プロジェクト構成
@@ -246,41 +216,33 @@ repo/
 │   ├── core/
 │   │   ├── config.py           # 設定ローダー
 │   │   ├── models.py           # SQLAlchemy ORM モデル
-│   │   ├── db.py               # DB セッション管理
+│   │   ├── db.py               # DB セッション管理 + マイグレーション
 │   │   ├── bibtex.py           # BibTeX パース/生成
 │   │   └── service.py          # CRUD + upsert ロジック
-│   ├── connectors/
-│   │   ├── acl.py              # ACL Anthology コネクタ
-│   │   ├── arxiv.py            # arXiv API コネクタ（v0.3）
-│   │   ├── openalex.py         # OpenAlex API コネクタ
-│   │   └── semantic_scholar.py # Semantic Scholar API コネクタ
+│   ├── connectors/             # 外部 API コネクタ
 │   ├── pipelines/
-│   │   ├── importer.py         # インポート処理
-│   │   ├── exporter.py         # BibTeX エクスポート
-│   │   ├── extract.py          # テキスト抽出（PDF/URL）
-│   │   ├── downloader.py       # PDF ダウンロード
-│   │   ├── references.py       # 参照抽出（多パターン対応 v0.4）
-│   │   ├── enricher.py         # 外部 API エンリッチ
-│   │   ├── watch.py            # ウォッチパイプライン（v0.3）
-│   │   └── inbox_recommend.py  # Inbox レコメンド（v0.4）
+│   │   ├── sync.py             # 同期パイプライン（v0.5）
+│   │   ├── backup.py           # バックアップ（v0.5）
+│   │   ├── watch.py            # ウォッチパイプライン
+│   │   ├── inbox_recommend.py  # Inbox レコメンド
+│   │   └── ...
 │   ├── analytics/
-│   │   └── trends.py           # トレンド分析（v0.3）
-│   ├── indexing/
-│   │   ├── engine.py           # FTS5 + FAISS インデックス
-│   │   └── chunker.py          # テキストチャンク分割（v0.4）
-│   └── graph/
-│       └── citations.py        # 引用グラフクエリ
-├── .github/
-│   ├── workflows/ci.yml        # CI（pytest, ruff, black）
-│   └── workflows/release.yml   # タグ付きリリース
+│   │   ├── trends.py           # トレンド分析
+│   │   ├── digest.py           # ダイジェスト生成（v0.5）
+│   │   ├── clustering.py       # トピッククラスタリング（v0.5）
+│   │   └── network.py          # 引用ネットワーク分析（v0.5）
+│   ├── indexing/               # FTS5 + FAISS インデックス
+│   └── graph/                  # 引用グラフクエリ
+├── .github/workflows/
+│   ├── ci.yml                  # CI（pytest, ruff, black）
+│   ├── release.yml             # タグ付きリリース
+│   └── sync.yml                # 定期同期（v0.5）
 ├── configs/config.yaml         # アプリ設定
-├── data/
-│   ├── library/papers/{id}/    # 論文ごとのファイル（PDF, テキスト, ノート）
-│   └── cache/                  # ダウンロードキャッシュ、埋め込み
+├── data/                       # ライブラリ + キャッシュ
 ├── db/app.sqlite               # SQLite データベース
-├── tests/                      # pytest テスト（51件）
-├── CHANGELOG.md                # 変更履歴
-├── pyproject.toml              # Python パッケージ設定
+├── tests/                      # pytest テスト（88件）
+├── CHANGELOG.md
+├── pyproject.toml
 └── README.md
 ```
 
@@ -294,40 +256,29 @@ storage:
   db_path: "db/app.sqlite"
 
 embedding:
-  backend: "sentence-transformers"
   model: "all-MiniLM-L6-v2"
-  dimension: 384
-
-download:
-  max_workers: 4
-  sleep_sec: 1.0
-
-external:
-  openalex:
-    enabled: true
-    email: ""              # polite pool
-  semantic_scholar:
-    enabled: true
-    api_key: ""            # 任意（レート制限緩和用）
 
 search:
   default_top_k: 20
   bm25_weight: 0.5
   vector_weight: 0.5
 
-watch:
-  arxiv:
-    sleep_sec: 3.0
-    max_results: 100
-  openalex:
-    sleep_sec: 1.0
-    max_results: 100
+sync:
+  enable: true
+  default_since_days: 7
+  run_recommend: true
+  output_dir: "data/cache/sync"
+  actions:
+    mode: "digest-only"  # digest-only or apply
+
+analytics:
+  default_clusters: 5
 ```
 
 ## テスト
 
 ```bash
-pytest tests/ -v          # 全テスト実行
+pytest tests/ -v          # 全テスト実行（88件）
 ruff check app/ tests/    # Lint
 black --check app/ tests/ # フォーマットチェック
 ```

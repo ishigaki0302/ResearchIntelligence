@@ -3,12 +3,9 @@
 import json
 from unittest.mock import patch
 
-import pytest
-
-from app.core.models import InboxItem, Item, Watch
+from app.core.models import InboxItem, Watch
 from app.core.service import upsert_item
 from app.pipelines.watch import accept_inbox_item, run_watch
-
 
 MOCK_ARXIV_XML = """\
 <?xml version="1.0" encoding="UTF-8"?>

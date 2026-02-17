@@ -32,24 +32,20 @@ def _build_query(session: Session, filters: dict | None = None) -> list[Item]:
             ).scalar_one_or_none()
             if coll:
                 item_ids = [
-                    ci.item_id for ci in
-                    session.execute(
-                        select(CollectionItem).where(CollectionItem.collection_id == coll.id)
-                    ).scalars().all()
+                    ci.item_id
+                    for ci in session.execute(select(CollectionItem).where(CollectionItem.collection_id == coll.id))
+                    .scalars()
+                    .all()
                 ]
                 stmt = stmt.where(Item.id.in_(item_ids))
             else:
                 return []
         if filters.get("tag"):
-            tag = session.execute(
-                select(Tag).where(Tag.name == filters["tag"])
-            ).scalar_one_or_none()
+            tag = session.execute(select(Tag).where(Tag.name == filters["tag"])).scalar_one_or_none()
             if tag:
                 item_ids = [
-                    it.item_id for it in
-                    session.execute(
-                        select(ItemTag).where(ItemTag.tag_id == tag.id)
-                    ).scalars().all()
+                    it.item_id
+                    for it in session.execute(select(ItemTag).where(ItemTag.tag_id == tag.id)).scalars().all()
                 ]
                 stmt = stmt.where(Item.id.in_(item_ids))
             else:

@@ -29,7 +29,7 @@ download:
   max_workers: 4
   sleep_sec: 1.0
   timeout: 60
-  user_agent: "ResearchIntelligence/0.4"
+  user_agent: "ResearchIntelligence/0.5"
 
 external:
   openalex:
@@ -58,3 +58,14 @@ watch:
   openalex:
     sleep_sec: 1.0
     max_results: 100
+
+sync:
+  enable: true
+  default_since_days: 7
+  run_recommend: true
+  output_dir: "data/cache/sync"
+  actions:
+    mode: "digest-only"  # digest-only or apply
+
+analytics:
+  default_clusters: 5

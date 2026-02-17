@@ -134,18 +134,20 @@ def _parse_atom_feed(xml_text: str, since_days: int | None = None) -> list[dict]
             if term:
                 categories.append(term)
 
-        results.append({
-            "source_id_type": "arxiv",
-            "source_id_value": arxiv_id,
-            "title": title,
-            "authors": authors,
-            "year": year,
-            "venue": "arXiv",
-            "url": id_url,
-            "pdf_url": pdf_url,
-            "abstract": abstract,
-            "published": published_str,
-            "categories": categories,
-        })
+        results.append(
+            {
+                "source_id_type": "arxiv",
+                "source_id_value": arxiv_id,
+                "title": title,
+                "authors": authors,
+                "year": year,
+                "venue": "arXiv",
+                "url": id_url,
+                "pdf_url": pdf_url,
+                "abstract": abstract,
+                "published": published_str,
+                "categories": categories,
+            }
+        )
 
     return results

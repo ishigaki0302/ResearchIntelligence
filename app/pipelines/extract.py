@@ -6,7 +6,7 @@ from pathlib import Path
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.config import resolve_path, get_config
+from app.core.config import get_config, resolve_path
 from app.core.models import Item
 
 logger = logging.getLogger(__name__)
@@ -41,6 +41,7 @@ def extract_url_text(url: str) -> tuple[str, str | None]:
 
     # Get clean text from the summary HTML
     import re
+
     html_content = doc.summary()
     # Strip HTML tags
     text = re.sub(r"<[^>]+>", " ", html_content)
@@ -98,9 +99,7 @@ def extract_text_for_item(item: Item, session: Session) -> bool:
 
 def extract_all(session: Session) -> dict:
     """Extract text for all items that don't have it yet."""
-    items = session.execute(
-        select(Item).where(Item.text_path.is_(None))
-    ).scalars().all()
+    items = session.execute(select(Item).where(Item.text_path.is_(None))).scalars().all()
 
     extracted = 0
     failed = 0

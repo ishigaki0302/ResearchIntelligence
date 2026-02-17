@@ -6,6 +6,42 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-02-17
+
+### Added
+- **Auto-sync pipeline (P12)**: Scheduled watch + recommend execution
+  - `ri sync run [--since 7d] [--watch <name>] [--recommend] [--out digest.md]`
+  - `ri sync status` shows recent sync jobs
+  - `ri sync digest` displays latest digest
+  - Job recording with summary (counts, duration, failures)
+  - `.github/workflows/sync.yml` for GitHub Actions (schedule + workflow_dispatch)
+  - Sync config in `config.yaml` (enable, default_since_days, output_dir, actions.mode)
+- **Weekly digest (P13)**: Markdown report generation for discoveries
+  - `ri digest weekly --since 7d --out digest.md`
+  - `ri digest watch --name <name> --since 14d`
+  - Summary: total discovered/recommended/accepted by watch
+  - Top recommended papers per watch with scores
+  - TF-IDF keyword extraction from inbox items
+  - Outputs both Markdown and JSON
+- **Advanced analytics (P14)**: Topic clustering and citation network analysis
+  - `ri analytics cluster [--clusters N] [--out clusters.json]`
+  - TF-IDF + KMeans clustering with top terms and representative papers
+  - `ri analytics graph-stats [--out graph.json]`
+  - Citation network: in-degree, out-degree, PageRank, community detection
+  - `/analytics` now shows Cluster Overview, Influential Papers, and Communities
+- **Operations quality (P15)**: Backup, migration, and observability
+  - `ri backup create --out backup.zip [--no-pdf] [--no-cache]`
+  - `ri backup restore <backup.zip>` (shows restore instructions)
+  - `ri migrate` applies pending DB migrations
+  - `schema_version` table tracks applied migrations
+  - Jobs table now includes `summary_json`, `started_at`, `finished_at`
+  - 19 new tests (88 total), all passing
+
+### Changed
+- Migration framework replaces ad-hoc `_migrate_add_columns` with versioned migrations
+- Added `networkx>=3.1` dependency for citation network analysis
+- Updated version to 0.5.0
+
 ## [0.4.0] - 2026-02-17
 
 ### Added
