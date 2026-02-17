@@ -7,11 +7,15 @@
     <label>ステータス:</label>
     <a href="/inbox?status=new" class="btn {% if current_status == 'new' %}{% else %}btn-secondary{% endif %}" style="font-size:0.8rem; padding:0.3rem 0.6rem;">新着</a>
     <a href="/inbox?status=recommended" class="btn {% if current_status == 'recommended' %}{% else %}btn-secondary{% endif %}" style="font-size:0.8rem; padding:0.3rem 0.6rem;">推薦</a>
+    <a href="/inbox?status=auto-accept" class="btn {% if current_status == 'auto-accept' %}{% else %}btn-secondary{% endif %}" style="font-size:0.8rem; padding:0.3rem 0.6rem;">自動承認</a>
     <a href="/inbox?status=accepted" class="btn btn-secondary" style="font-size:0.8rem; padding:0.3rem 0.6rem;">承認済み</a>
     <a href="/inbox?status=rejected" class="btn btn-secondary" style="font-size:0.8rem; padding:0.3rem 0.6rem;">却下済み</a>
     <a href="/inbox?status=all" class="btn btn-secondary" style="font-size:0.8rem; padding:0.3rem 0.6rem;">すべて</a>
     <form method="post" action="/inbox/recommend" style="margin-left:auto;">
         <button type="submit" class="btn btn-secondary" style="font-size:0.8rem; padding:0.3rem 0.6rem;">レコメンド実行</button>
+    </form>
+    <form method="post" action="/inbox/auto-accept">
+        <button type="submit" class="btn btn-secondary" style="font-size:0.8rem; padding:0.3rem 0.6rem;">自動承認評価</button>
     </form>
 </div>
 

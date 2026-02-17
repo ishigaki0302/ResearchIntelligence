@@ -31,6 +31,133 @@ def _title_similarity(a: str, b: str) -> float:
     return len(intersection) / len(union)
 
 
+def build_citations_from_metadata(
+    session: Session,
+    items: list | None = None,
+    limit: int | None = None,
+) -> dict:
+    """Build citation relationships using Semantic Scholar API references.
+
+    For each item, queries S2 for its references using available external IDs
+    (DOI, arXiv), then matches returned references against DB items by their
+    external IDs. Creates Citation rows with source="metadata".
+
+    Args:
+        session: SQLAlchemy session
+        items: specific items to process (default: all items)
+        limit: max items to process
+
+    Returns:
+        Stats dict with processed, citations_added, api_hits, api_misses.
+    """
+    import hashlib
+    import time
+
+    from app.connectors.semantic_scholar import get_references
+
+    stats = {"processed": 0, "citations_added": 0, "api_hits": 0, "api_misses": 0, "skipped": 0}
+
+    if items is None:
+        items = session.execute(select(Item).where(Item.status == "active")).scalars().all()
+
+    if limit:
+        items = items[:limit]
+
+    # Build lookup index: (id_type, id_value) -> item_id
+    all_item_ids = session.execute(select(ItemId)).scalars().all()
+    id_lookup: dict[tuple[str, str], int] = {}
+    for iid in all_item_ids:
+        id_lookup[(iid.id_type, iid.id_value)] = iid.item_id
+
+    for item in items:
+        # Find a suitable S2 paper identifier
+        ext_ids = {eid.id_type: eid.id_value for eid in item.external_ids}
+        paper_id = None
+        if "doi" in ext_ids:
+            paper_id = f"DOI:{ext_ids['doi']}"
+        elif "arxiv" in ext_ids:
+            paper_id = f"ARXIV:{ext_ids['arxiv']}"
+        elif "s2" in ext_ids:
+            paper_id = ext_ids["s2"]
+
+        if not paper_id:
+            stats["skipped"] += 1
+            continue
+
+        # Get existing citation hashes to dedup
+        existing_hashes = set(
+            session.execute(
+                select(Citation.raw_cite_hash).where(
+                    Citation.src_item_id == item.id,
+                    Citation.source == "metadata",
+                    Citation.raw_cite_hash.is_not(None),
+                )
+            )
+            .scalars()
+            .all()
+        )
+
+        refs = get_references(paper_id)
+        if not refs:
+            stats["api_misses"] += 1
+            stats["processed"] += 1
+            continue
+
+        stats["api_hits"] += 1
+
+        for ref in refs:
+            ref_ext = ref.get("externalIds") or {}
+            ref_title = ref.get("title") or ""
+            matched_item_id = None
+
+            # Try matching by DOI
+            if ref_ext.get("DOI"):
+                matched_item_id = id_lookup.get(("doi", ref_ext["DOI"]))
+            # Try arXiv
+            if not matched_item_id and ref_ext.get("ArXiv"):
+                matched_item_id = id_lookup.get(("arxiv", ref_ext["ArXiv"]))
+            # Try ACL
+            if not matched_item_id and ref_ext.get("ACL"):
+                matched_item_id = id_lookup.get(("acl", ref_ext["ACL"]))
+            # Try S2 CorpusId
+            if not matched_item_id and ref_ext.get("CorpusId"):
+                matched_item_id = id_lookup.get(("s2", str(ref_ext["CorpusId"])))
+
+            if not matched_item_id or matched_item_id == item.id:
+                continue
+
+            # Create citation with dedup
+            raw_text = ref_title[:500] if ref_title else ref.get("paperId", "")[:500]
+            normalized = re.sub(r"\s+", " ", raw_text.strip().lower())
+            cite_hash = hashlib.sha256(
+                f"metadata:{item.id}:{matched_item_id}".encode("utf-8")
+            ).hexdigest()
+
+            if cite_hash in existing_hashes:
+                continue
+
+            dst_key = ref_ext.get("DOI") or ref_ext.get("ArXiv") or None
+            cit = Citation(
+                src_item_id=item.id,
+                dst_item_id=matched_item_id,
+                raw_cite=raw_text,
+                dst_key=dst_key,
+                source="metadata",
+                raw_cite_hash=cite_hash,
+            )
+            session.add(cit)
+            existing_hashes.add(cite_hash)
+            stats["citations_added"] += 1
+
+        stats["processed"] += 1
+        if stats["processed"] % 50 == 0:
+            session.flush()
+            logger.info(f"build_citations_from_metadata progress: {stats['processed']}/{len(items)}")
+
+    session.commit()
+    return stats
+
+
 def resolve_citations(session: Session) -> dict:
     """Attempt to resolve unresolved citations using multiple strategies.
 
@@ -212,6 +339,7 @@ def get_citation_subgraph(session: Session, item_id: int, depth: int = 1) -> dic
         else:
             unresolved_refs.append(
                 {
+                    "citation_id": c.id,
                     "raw_cite": (c.raw_cite or "")[:200],
                     "dst_key": c.dst_key,
                 }

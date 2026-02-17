@@ -1,5 +1,6 @@
 """Search indexing engine combining FTS5 (BM25) and FAISS (vector)."""
 
+import hashlib
 import json
 import logging
 from pathlib import Path
@@ -333,6 +334,53 @@ def rebuild_index(session: Session, include_chunks: bool = False):
     logger.info("Index rebuild complete.")
 
 
+def _compute_text_hash(item: Item) -> str:
+    """Compute SHA256 hash of title+abstract for change detection."""
+    text_str = f"{item.title or ''}\n{item.abstract or ''}"
+    return hashlib.sha256(text_str.encode("utf-8")).hexdigest()
+
+
+def incremental_index(session: Session, include_chunks: bool = False) -> dict:
+    """Incrementally re-index only changed items.
+
+    Compares stored text_hash vs computed; only re-embeds changed items.
+    FTS5 is always fully rebuilt (contentless limitation).
+    Returns {total, changed, unchanged}.
+    """
+    items = session.execute(select(Item)).scalars().all()
+    total = len(items)
+    changed = 0
+    unchanged = 0
+
+    # Detect which items changed
+    changed_items = []
+    for item in items:
+        new_hash = _compute_text_hash(item)
+        if item.text_hash != new_hash:
+            item.text_hash = new_hash
+            changed_items.append(item)
+            changed += 1
+        else:
+            unchanged += 1
+
+    session.flush()
+
+    # FTS5 must always be fully rebuilt (contentless tables don't support partial updates)
+    logger.info("Rebuilding FTS5 index (full rebuild required)...")
+    rebuild_fts(session)
+
+    if changed_items:
+        # Rebuild full FAISS index (simpler and safer than partial update)
+        logger.info(f"Re-embedding {len(changed_items)} changed items (rebuilding FAISS)...")
+        rebuild_faiss(session)
+        if include_chunks:
+            rebuild_faiss_chunks(session)
+    else:
+        logger.info("No items changed — skipping FAISS rebuild.")
+
+    return {"total": total, "changed": changed, "unchanged": unchanged}
+
+
 def hybrid_search(
     session: Session,
     query: str,
@@ -446,6 +494,16 @@ def hybrid_search(
                 continue
             if filters.get("type") and item.type != filters["type"]:
                 continue
+            if filters.get("tag"):
+                from app.core.models import ItemTag, Tag
+
+                tag_match = session.execute(
+                    select(ItemTag)
+                    .join(Tag)
+                    .where(ItemTag.item_id == item.id, Tag.name == filters["tag"])
+                ).first()
+                if not tag_match:
+                    continue
 
             result["item"] = item
             filtered.append(result)

@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}Jobs — Research Intelligence{% endblock %}
+{% block content %}
+<h1>Jobs</h1>
+
+{% if jobs %}
+<table style="width:100%; border-collapse:collapse; font-size:0.9em;">
+    <thead>
+        <tr style="border-bottom:2px solid #ddd;">
+            <th style="text-align:left; padding:0.5rem;">ID</th>
+            <th style="text-align:left; padding:0.5rem;">種別</th>
+            <th style="text-align:left; padding:0.5rem;">ステータス</th>
+            <th style="text-align:left; padding:0.5rem;">開始</th>
+            <th style="text-align:left; padding:0.5rem;">終了</th>
+            <th style="text-align:left; padding:0.5rem;">時間</th>
+            <th style="text-align:left; padding:0.5rem;">概要</th>
+        </tr>
+    </thead>
+    <tbody>
+    {% for job in jobs %}
+        <tr style="border-bottom:1px solid #eee;">
+            <td style="padding:0.5rem;">{{ job.id }}</td>
+            <td style="padding:0.5rem;"><code>{{ job.job_type }}</code></td>
+            <td style="padding:0.5rem;">
+                {% if job.status == 'done' %}
+                <span class="badge" style="background:#d1fae5; color:#059669;">{{ job.status }}</span>
+                {% elif job.status == 'failed' %}
+                <span class="badge" style="background:#fecaca; color:#dc2626;">{{ job.status }}</span>
+                {% elif job.status == 'running' %}
+                <span class="badge" style="background:#fef08a; color:#854d0e;">{{ job.status }}</span>
+                {% else %}
+                <span class="badge">{{ job.status }}</span>
+                {% endif %}
+            </td>
+            <td style="padding:0.5rem;">{{ job.started_at or '—' }}</td>
+            <td style="padding:0.5rem;">{{ job.finished_at or '—' }}</td>
+            <td style="padding:0.5rem;">
+                {% if job.started_at and job.finished_at %}
+                    {{ (job.finished_at - job.started_at).total_seconds()|round(1) }}s
+                {% else %}
+                    —
+                {% endif %}
+            </td>
+            <td style="padding:0.5rem; font-size:0.85em;">
+                {% if job.summary_json %}
+                    {{ job.summary_json[:100] }}{% if job.summary_json|length > 100 %}...{% endif %}
+                {% elif job.error %}
+                    <span style="color:#dc2626;">{{ job.error[:100] }}</span>
+                {% else %}
+                    —
+                {% endif %}
+            </td>
+        </tr>
+    {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p class="meta">ジョブの記録がありません。</p>
+{% endif %}
+{% endblock %}

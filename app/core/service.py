@@ -212,6 +212,34 @@ def upsert_item(
     return item, created
 
 
+def _render_note_template(item: Item) -> str:
+    """Render a note template for the given item.
+
+    Loads template from config path, replaces placeholders.
+    Falls back to a simple default if template not found.
+    """
+    try:
+        cfg = get_config()
+        template_rel = cfg.get("notes", {}).get("template_path", "")
+        if template_rel:
+            template_path = resolve_path(template_rel)
+            if template_path.exists():
+                template = template_path.read_text(encoding="utf-8")
+                authors_str = ", ".join(item.author_names) if item.author_names else "Unknown"
+                return (
+                    template.replace("{{title}}", item.title or "Untitled")
+                    .replace("{{authors}}", authors_str)
+                    .replace("{{year}}", str(item.year) if item.year else "?")
+                    .replace("{{venue}}", item.venue_instance or item.venue or "—")
+                    .replace("{{bibtex_key}}", item.bibtex_key or "—")
+                )
+    except Exception:
+        pass
+
+    # Default fallback
+    return f"# {item.title}\n\n## Summary\n\n\n## Key Points\n\n\n## Notes\n\n"
+
+
 def ensure_note(session: Session, item: Item) -> Note:
     """Ensure a main.md note exists for the item."""
     existing = session.execute(select(Note).where(Note.item_id == item.id, Note.title == "main")).scalar_one_or_none()
@@ -222,10 +250,8 @@ def ensure_note(session: Session, item: Item) -> Note:
     note_path = note_dir / "notes" / "main.md"
     note_path.parent.mkdir(parents=True, exist_ok=True)
     if not note_path.exists():
-        note_path.write_text(
-            f"# {item.title}\n\n## Summary\n\n\n## Key Points\n\n\n## Notes\n\n",
-            encoding="utf-8",
-        )
+        content = _render_note_template(item)
+        note_path.write_text(content, encoding="utf-8")
     rel_path = str(note_path.relative_to(resolve_path(".")))
     note = Note(item_id=item.id, path=rel_path, title="main")
     session.add(note)

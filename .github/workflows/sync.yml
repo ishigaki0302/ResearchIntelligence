@@ -9,9 +9,27 @@ on:
         description: "Look back period (e.g. 7d, 14d)"
         required: false
         default: "7d"
+      publish_mode:
+        description: "Digest publishing mode"
+        required: false
+        type: choice
+        default: "none"
+        options:
+          - none
+          - issue_new
+          - issue_append
+      target_issue_number:
+        description: "Issue number for issue_append mode"
+        required: false
+        default: ""
+      since_days:
+        description: "Override since_days (integer)"
+        required: false
+        default: ""
 
 permissions:
   contents: read
+  issues: write
 
 jobs:
   sync:
@@ -45,3 +63,45 @@ jobs:
             data/cache/sync/digest*.json
           if-no-files-found: warn
           retention-days: 30
+
+      - name: Ensure ri-digest label
+        if: ${{ github.event.inputs.publish_mode != '' && github.event.inputs.publish_mode != 'none' }}
+        run: gh label create "ri-digest" --color "0e8a16" --description "Auto-generated research digest" || true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish digest to GitHub Issue
+        if: ${{ github.event.inputs.publish_mode != '' && github.event.inputs.publish_mode != 'none' }}
+        run: |
+          PUBLISH_MODE="${{ github.event.inputs.publish_mode }}"
+          TARGET_ISSUE="${{ github.event.inputs.target_issue_number }}"
+          TODAY=$(date +%Y-%m-%d)
+          DIGEST_FILE="data/cache/sync/digest.md"
+
+          if [ ! -f "$DIGEST_FILE" ]; then
+            echo "No digest file found, skipping publish."
+            exit 0
+          fi
+
+          if [ "$PUBLISH_MODE" = "issue_new" ]; then
+            # Check for same-day duplicate
+            EXISTING=$(gh issue list --label "ri-digest" --search "[ri] Weekly Digest $TODAY" --state open --json number --jq '.[0].number' 2>/dev/null || echo "")
+            if [ -n "$EXISTING" ]; then
+              echo "Found existing digest issue #$EXISTING for today, appending instead."
+              gh issue comment "$EXISTING" --body-file "$DIGEST_FILE"
+            else
+              gh issue create \
+                --title "[ri] Weekly Digest $TODAY" \
+                --body-file "$DIGEST_FILE" \
+                --label "ri-digest"
+            fi
+
+          elif [ "$PUBLISH_MODE" = "issue_append" ]; then
+            if [ -z "$TARGET_ISSUE" ]; then
+              echo "Error: target_issue_number required for issue_append mode"
+              exit 1
+            fi
+            gh issue comment "$TARGET_ISSUE" --body-file "$DIGEST_FILE"
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

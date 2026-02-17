@@ -85,6 +85,28 @@ def search_s2_by_title(title: str) -> list[dict]:
         return []
 
 
+def get_references(paper_id: str) -> list[dict]:
+    """Get references for a paper from Semantic Scholar.
+
+    Args:
+        paper_id: S2 paper identifier (e.g. "DOI:10.xxx", "ARXIV:2401.xxx", or CorpusId)
+
+    Returns:
+        List of referenced paper dicts with externalIds and title.
+    """
+    url = f"{S2_API}/paper/{paper_id}/references"
+    params = {"fields": "externalIds,title", "limit": "1000"}
+    data = _cached_get(url, params)
+    if not data:
+        return []
+    refs = []
+    for entry in data.get("data", []):
+        cited = entry.get("citedPaper")
+        if cited and cited.get("paperId"):
+            refs.append(cited)
+    return refs
+
+
 def extract_ids_from_s2(paper: dict) -> dict[str, str]:
     """Extract external IDs from a Semantic Scholar paper object."""
     ids = {}

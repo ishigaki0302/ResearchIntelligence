@@ -36,6 +36,9 @@ app.add_typer(sync_app)
 digest_app = typer.Typer(name="digest", help="Generate digest reports")
 app.add_typer(digest_app)
 
+dedup_app = typer.Typer(name="dedup", help="Detect and merge duplicates")
+app.add_typer(dedup_app)
+
 backup_app = typer.Typer(name="backup", help="Backup and restore")
 app.add_typer(backup_app)
 
@@ -171,10 +174,11 @@ def import_cmd(
 @app.command()
 def index(
     chunks: bool = typer.Option(False, "--chunks", help="Also chunk texts and build chunk FAISS index"),
+    incremental: bool = typer.Option(False, "--incremental", help="Only re-index changed items"),
 ):
     """Rebuild search indices (FTS5 + FAISS)."""
     from app.core.db import get_session, init_db
-    from app.indexing.engine import rebuild_index
+    from app.indexing.engine import incremental_index, rebuild_index
     from app.pipelines.extract import extract_all
 
     init_db()
@@ -195,9 +199,18 @@ def index(
                 f"Skipped: {chunk_result['skipped']}, Failed: {chunk_result['failed']}"
             )
 
-        typer.echo("Building indices...")
-        rebuild_index(session, include_chunks=chunks)
-        typer.echo("Index rebuild complete.")
+        if incremental:
+            typer.echo("Running incremental index...")
+            result = incremental_index(session, include_chunks=chunks)
+            session.commit()
+            typer.echo(
+                f"Incremental index: {result['total']} total, "
+                f"{result['changed']} changed, {result['unchanged']} unchanged"
+            )
+        else:
+            typer.echo("Building indices...")
+            rebuild_index(session, include_chunks=chunks)
+            typer.echo("Index rebuild complete.")
     finally:
         session.close()
 
@@ -348,6 +361,43 @@ def extract_references(
         session.close()
 
 
+@app.command("build-citations")
+def build_citations(
+    limit: Optional[int] = typer.Option(None, "--limit", help="Max items to process"),
+    item_id: Optional[int] = typer.Option(None, "--id", help="Process a single item"),
+):
+    """Build citation relationships from metadata via Semantic Scholar API."""
+    from app.core.db import get_session, init_db
+    from app.core.models import Item
+    from app.graph.citations import build_citations_from_metadata, resolve_citations
+
+    init_db()
+    session = get_session()
+
+    try:
+        items = None
+        if item_id:
+            item = session.get(Item, item_id)
+            if not item:
+                typer.echo(f"Item {item_id} not found", err=True)
+                raise typer.Exit(1)
+            items = [item]
+
+        typer.echo("Building citations from metadata (Semantic Scholar API)...")
+        result = build_citations_from_metadata(session, items=items, limit=limit)
+        typer.echo(
+            f"Done: {result['processed']} processed, {result['citations_added']} citations added, "
+            f"{result['api_hits']} API hits, {result['api_misses']} API misses, "
+            f"{result['skipped']} skipped (no external ID)"
+        )
+
+        typer.echo("Resolving citations...")
+        res = resolve_citations(session)
+        typer.echo(f"Resolved {res['resolved']} citations, {res['remaining']} remaining unresolved")
+    finally:
+        session.close()
+
+
 @app.command("download-pdf")
 def download_pdf(
     collection: Optional[str] = typer.Option(None, "--collection", help="Filter by collection name"),
@@ -355,6 +405,7 @@ def download_pdf(
     workers: int = typer.Option(4, "--workers", help="Parallel workers (currently sequential)"),
     failed_only: bool = typer.Option(False, "--failed-only", help="Retry only previously failed downloads"),
     item_id: Optional[int] = typer.Option(None, "--id", help="Download PDF for a single item"),
+    extract: bool = typer.Option(False, "--extract", help="Also extract text and references after download"),
 ):
     """Download PDFs for items in the database."""
     import json
@@ -384,6 +435,25 @@ def download_pdf(
             except Exception as e:
                 typer.echo(f"Failed: {e}", err=True)
                 raise typer.Exit(1)
+
+            if extract:
+                from app.graph.citations import resolve_citations
+                from app.pipelines.extract import extract_text_for_item
+                from app.pipelines.references import extract_references_for_item
+
+                typer.echo("Extracting text...")
+                extracted = extract_text_for_item(item, session)
+                session.commit()
+                typer.echo(f"  Text extracted: {extracted}")
+
+                typer.echo("Extracting references...")
+                entries = extract_references_for_item(session, item)
+                session.commit()
+                typer.echo(f"  References extracted: {len(entries)}")
+
+                typer.echo("Resolving citations...")
+                res = resolve_citations(session)
+                typer.echo(f"  Resolved {res['resolved']}, {res['remaining']} remaining")
             return
 
         # Build query
@@ -735,6 +805,45 @@ def inbox_recommend(
         session.close()
 
 
+@inbox_app.command("auto-accept")
+def inbox_auto_accept(
+    dry_run: bool = typer.Option(True, "--dry-run/--apply", help="Dry-run (default) or apply"),
+    limit: Optional[int] = typer.Option(None, "--limit", help="Max items to process"),
+    threshold: float = typer.Option(0.75, "--threshold", help="Score threshold for auto-accept"),
+):
+    """Auto-accept inbox items based on quality and relevance scoring."""
+    from app.core.db import get_session, init_db
+    from app.pipelines.auto_accept import apply_auto_accept, evaluate_auto_accept
+
+    init_db()
+    session = get_session()
+    try:
+        if dry_run:
+            results = evaluate_auto_accept(session, threshold=threshold, limit=limit)
+            if not results:
+                typer.echo("No inbox items to evaluate.")
+                return
+            for r in results:
+                status = "ELIGIBLE" if r["eligible"] else "SKIP"
+                flags = ", ".join(r["quality_flags"]) if r["quality_flags"] else "none"
+                typer.echo(
+                    f"[{status}] [{r['inbox_id']}] {r['title'][:60]} "
+                    f"score={r['auto_accept_score']:.2f} flags={flags}"
+                )
+            eligible = sum(1 for r in results if r["eligible"])
+            typer.echo(f"\nSummary: {eligible} eligible, {len(results) - eligible} skipped")
+            typer.echo("Run with --apply to accept eligible items.")
+        else:
+            result = apply_auto_accept(session, threshold=threshold, limit=limit)
+            session.commit()
+            typer.echo(f"Auto-accept: {result['accepted']} accepted, {result['skipped']} skipped")
+            for d in result["details"]:
+                if d["action"] == "accepted":
+                    typer.echo(f"  Accepted: [{d['inbox_id']}] {d['title'][:60]} (item_id={d['item_id']})")
+    finally:
+        session.close()
+
+
 @inbox_app.command("reject")
 def inbox_reject(
     inbox_id: int = typer.Argument(..., help="Inbox item ID to reject"),
@@ -785,6 +894,64 @@ def analytics_export(
         }
         Path(out).write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
         typer.echo(f"Exported analytics to {out}")
+    finally:
+        session.close()
+
+
+@dedup_app.command("detect")
+def dedup_detect():
+    """Detect duplicate items in the database."""
+    from app.core.db import get_session, init_db
+    from app.pipelines.dedup import detect_duplicates
+
+    init_db()
+    session = get_session()
+    try:
+        dupes = detect_duplicates(session)
+        if not dupes:
+            typer.echo("No duplicates found.")
+            return
+        typer.echo(f"Found {len(dupes)} potential duplicate(s):\n")
+        for d in dupes:
+            from app.core.models import Item
+
+            a = session.get(Item, d["item_a_id"])
+            b = session.get(Item, d["item_b_id"])
+            typer.echo(
+                f"  [{d['confidence']:.2f}] {d['method']}: "
+                f"#{d['item_a_id']} '{(a.title if a else '?')[:50]}' "
+                f"<-> #{d['item_b_id']} '{(b.title if b else '?')[:50]}'"
+            )
+            if d["details"]:
+                typer.echo(f"    {d['details']}")
+    finally:
+        session.close()
+
+
+@dedup_app.command("merge")
+def dedup_merge(
+    src_id: int = typer.Argument(..., help="Source item ID (will be marked as merged)"),
+    dst_id: int = typer.Argument(..., help="Destination item ID (will receive entities)"),
+    dry_run: bool = typer.Option(True, "--dry-run/--apply", help="Dry-run (default) or apply"),
+):
+    """Merge source item into destination item."""
+    from app.core.db import get_session, init_db
+    from app.pipelines.dedup import merge_items
+
+    init_db()
+    session = get_session()
+    try:
+        result = merge_items(session, src_id, dst_id, dry_run=dry_run)
+        if "error" in result:
+            typer.echo(f"Error: {result['error']}", err=True)
+            raise typer.Exit(1)
+        if dry_run:
+            typer.echo(f"Dry-run merge #{src_id} -> #{dst_id}:")
+        else:
+            typer.echo(f"Merged #{src_id} -> #{dst_id}:")
+            session.commit()
+        for entity, count in result["moved"].items():
+            typer.echo(f"  {entity}: {count}")
     finally:
         session.close()
 

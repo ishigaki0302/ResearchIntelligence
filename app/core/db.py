@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 _engine = None
 _SessionLocal = None
 
-SCHEMA_VERSION = 2  # Current schema version
+SCHEMA_VERSION = 3  # Current schema version
 
 
 def get_engine(db_path: Path | None = None):
@@ -125,9 +125,32 @@ def _migration_v2(engine):
         conn.commit()
 
 
+def _migration_v3(engine):
+    """v0.6: auto-accept columns on inbox_items, dedup columns on items."""
+    insp = inspect(engine)
+    migrations = [
+        ("inbox_items", "auto_accept", "BOOLEAN DEFAULT 0"),
+        ("inbox_items", "auto_accept_score", "FLOAT"),
+        ("inbox_items", "quality_flags_json", "TEXT"),
+        ("items", "text_hash", "VARCHAR(64)"),
+        ("items", "status", "VARCHAR(16) DEFAULT 'active'"),
+        ("items", "merged_into_id", "INTEGER REFERENCES items(id) ON DELETE SET NULL"),
+    ]
+    with engine.connect() as conn:
+        for table, column, col_type in migrations:
+            if table not in insp.get_table_names():
+                continue
+            existing = [c["name"] for c in insp.get_columns(table)]
+            if column not in existing:
+                conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {column} {col_type}"))
+                logger.info(f"Migration v3: added {table}.{column}")
+        conn.commit()
+
+
 MIGRATIONS = {
     1: ("v0.4 column additions", _migration_v1),
     2: ("v0.5 job summary + timestamps", _migration_v2),
+    3: ("v0.6 auto-accept + dedup columns", _migration_v3),
 }
 
 

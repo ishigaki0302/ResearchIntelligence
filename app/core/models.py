@@ -44,6 +44,9 @@ class Item(Base):
     text_path = Column(Text)
     bibtex_key = Column(String(256), unique=True)
     bibtex_raw = Column(Text)  # raw BibTeX entry
+    text_hash = Column(String(64))  # SHA256 of title+abstract for incremental indexing
+    status = Column(String(16), nullable=False, default="active")  # active/merged
+    merged_into_id = Column(Integer, ForeignKey("items.id", ondelete="SET NULL"), nullable=True)
     created_at = Column(DateTime, default=_utcnow)
     updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
 
@@ -251,6 +254,9 @@ class InboxItem(Base):
     recommend_score = Column(Float)
     reasons_json = Column(Text)  # JSON list of reason strings
     auto_tags_json = Column(Text)  # JSON list of suggested tag strings
+    auto_accept = Column(Boolean, default=False)
+    auto_accept_score = Column(Float)
+    quality_flags_json = Column(Text)  # JSON list of quality flag strings
 
     watch = relationship("Watch", back_populates="inbox_items")
     accepted_item = relationship("Item")

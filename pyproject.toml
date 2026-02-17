@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "research-intelligence"
-version = "0.5.0"
+version = "0.6.0"
 description = "Local paper/article management + search + visualization system"
 requires-python = ">=3.11"
 dependencies = [

@@ -20,8 +20,39 @@
     <a href="{{ item.source_url }}" target="_blank" class="btn btn-secondary">原文リンク</a>
     {% if item.pdf_path %}
     <span class="badge" style="margin-left: 0.5rem;">PDF あり</span>
+    {% else %}
+    <button id="btn-download-extract" onclick="downloadAndExtract()" class="btn btn-secondary" style="margin-left: 0.5rem;">PDF取得＆引用抽出</button>
+    <span id="download-status" style="margin-left: 0.5rem;"></span>
     {% endif %}
 </div>
+<script>
+function downloadAndExtract() {
+    var btn = document.getElementById('btn-download-extract');
+    var status = document.getElementById('download-status');
+    btn.disabled = true;
+    btn.textContent = '処理中...';
+    status.textContent = '';
+
+    fetch('/api/item/{{ item.id }}/download-and-extract', { method: 'POST' })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            var steps = data.steps || {};
+            var msgs = [];
+            if (steps.download) msgs.push('PDF: ' + (steps.download.ok ? (steps.download.downloaded ? 'ダウンロード済み' : 'スキップ') : 'エラー'));
+            if (steps.extract_text) msgs.push('テキスト: ' + (steps.extract_text.ok ? (steps.extract_text.extracted ? '抽出済み' : 'スキップ') : 'エラー'));
+            if (steps.extract_references) msgs.push('参照: ' + (steps.extract_references.ok ? steps.extract_references.count + '件' : 'エラー'));
+            if (steps.resolve) msgs.push('解決: ' + (steps.resolve.ok ? steps.resolve.resolved + '件' : 'エラー'));
+            status.textContent = msgs.join(' | ');
+            btn.textContent = '完了';
+            setTimeout(function() { location.reload(); }, 2000);
+        })
+        .catch(function(e) {
+            status.textContent = 'エラー: ' + e;
+            btn.disabled = false;
+            btn.textContent = 'PDF取得＆引用抽出';
+        });
+}
+</script>
 {% endif %}
 
 <div class="card" style="margin-bottom: 1rem;">
@@ -52,7 +83,20 @@
 
 {% if item.bibtex_raw %}
 <h2>BibTeX</h2>
-<pre>{{ item.bibtex_raw }}</pre>
+<div style="position:relative;">
+    <button onclick="copyBibtex()" style="position:absolute; top:0.3rem; right:0.3rem; font-size:0.75rem; padding:0.2rem 0.5rem;" title="コピー">コピー</button>
+    <pre id="bibtex-raw">{{ item.bibtex_raw }}</pre>
+</div>
+<script>
+function copyBibtex() {
+    var text = document.getElementById('bibtex-raw').innerText;
+    navigator.clipboard.writeText(text).then(function() {
+        var btn = event.target;
+        btn.textContent = 'コピー済み';
+        setTimeout(function() { btn.textContent = 'コピー'; }, 2000);
+    });
+}
+</script>
 {% endif %}
 
 <h2>ノート</h2>
@@ -74,6 +118,8 @@
     <div style="display: flex; gap: 1rem; margin-bottom: 1rem;">
         <button onclick="showTab('refs')" id="tab-refs" style="font-weight:bold; border-bottom: 2px solid #007bff;">References</button>
         <button onclick="showTab('citedby')" id="tab-citedby">Cited by</button>
+        <button onclick="showTab('similar')" id="tab-similar">Similar</button>
+        <button onclick="showTab('mentions')" id="tab-mentions">Mentioned in Notes</button>
         <button onclick="showTab('graph')" id="tab-graph">Graph</button>
     </div>
 
@@ -104,7 +150,15 @@
         <h3 style="margin-top:1rem;">未解決の参照 ({{ graph.unresolved_refs|length }}件)</h3>
         <ul style="font-size:0.85em; color:#666;">
         {% for ref in graph.unresolved_refs[:20] %}
-            <li>{{ ref.raw_cite }}{% if ref.dst_key %} <code>[{{ ref.dst_key }}]</code>{% endif %}</li>
+            <li style="margin-bottom:0.5rem;">
+                {{ ref.raw_cite }}{% if ref.dst_key %} <code>[{{ ref.dst_key }}]</code>{% endif %}
+                {% if ref.citation_id %}
+                <form action="/api/citation/{{ ref.citation_id }}/resolve" method="post" style="display:inline; margin-left:0.5rem;">
+                    <input type="number" name="target_item_id" placeholder="Item ID" style="width:80px; font-size:0.8em; padding:0.1rem;">
+                    <button type="submit" style="font-size:0.75em; padding:0.1rem 0.4rem;">解決</button>
+                </form>
+                {% endif %}
+            </li>
         {% endfor %}
         {% if graph.unresolved_refs|length > 20 %}
             <li>... 他 {{ graph.unresolved_refs|length - 20 }}件</li>
@@ -137,6 +191,61 @@
         {% endif %}
     </div>
 
+    <div id="panel-similar" style="display:none;">
+        <h3>類似論文</h3>
+        <div id="similar-list"><p class="meta">読み込み中...</p></div>
+        <script>
+        (function() {
+            fetch('/api/item/{{ item.id }}/similar')
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    var el = document.getElementById('similar-list');
+                    if (!data || data.length === 0) {
+                        el.innerHTML = '<p class="meta">類似論文なし</p>';
+                        return;
+                    }
+                    var html = '<table style="width:100%; border-collapse:collapse; font-size:0.9em;">';
+                    html += '<thead><tr style="border-bottom:2px solid #ddd;"><th style="text-align:left; padding:0.3rem;">タイトル</th><th style="padding:0.3rem; width:60px;">年</th><th style="padding:0.3rem; width:60px;">類似度</th></tr></thead><tbody>';
+                    data.forEach(function(d) {
+                        html += '<tr style="border-bottom:1px solid #eee;"><td style="padding:0.3rem;"><a href="/item/' + d.id + '">' + d.title + '</a></td><td style="padding:0.3rem;">' + (d.year || '?') + '</td><td style="padding:0.3rem;">' + d.score + '</td></tr>';
+                    });
+                    html += '</tbody></table>';
+                    el.innerHTML = html;
+                })
+                .catch(function() {
+                    document.getElementById('similar-list').innerHTML = '<p class="meta">読み込みに失敗しました</p>';
+                });
+        })();
+        </script>
+    </div>
+
+    <div id="panel-mentions" style="display:none;">
+        <h3>ノートで言及</h3>
+        <div id="mentions-list"><p class="meta">読み込み中...</p></div>
+        <script>
+        (function() {
+            fetch('/api/item/{{ item.id }}/mentioned-in-notes')
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    var el = document.getElementById('mentions-list');
+                    if (!data || data.length === 0) {
+                        el.innerHTML = '<p class="meta">ノートでの言及なし</p>';
+                        return;
+                    }
+                    var html = '<ul>';
+                    data.forEach(function(d) {
+                        html += '<li><a href="/item/' + d.id + '">' + d.title + '</a> (' + (d.year || '?') + ')</li>';
+                    });
+                    html += '</ul>';
+                    el.innerHTML = html;
+                })
+                .catch(function() {
+                    document.getElementById('mentions-list').innerHTML = '<p class="meta">読み込みに失敗しました</p>';
+                });
+        })();
+        </script>
+    </div>
+
     <div id="panel-graph" style="display:none;">
         <a href="/graph/{{ item.id }}" class="btn btn-secondary">グラフを表示</a>
         <a href="/graph/{{ item.id }}?depth=2" class="btn btn-secondary">2ホップグラフ</a>
@@ -145,7 +254,7 @@
 
 <script>
 function showTab(name) {
-    ['refs', 'citedby', 'graph'].forEach(function(t) {
+    ['refs', 'citedby', 'similar', 'mentions', 'graph'].forEach(function(t) {
         document.getElementById('panel-' + t).style.display = t === name ? 'block' : 'none';
         var tab = document.getElementById('tab-' + t);
         tab.style.fontWeight = t === name ? 'bold' : 'normal';

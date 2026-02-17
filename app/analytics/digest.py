@@ -187,9 +187,7 @@ def _render_markdown(data: dict, watch_name: str | None = None) -> str:
         lines.append("")
         for wname, ws in data["by_watch"].items():
             lines.append(f"### {wname}")
-            lines.append(
-                f"発見: {ws['discovered']} | 推薦: {ws['recommended']} | 承認: {ws['accepted']}"
-            )
+            lines.append(f"発見: {ws['discovered']} | 推薦: {ws['recommended']} | 承認: {ws['accepted']}")
             lines.append("")
             if ws["top_recommended"]:
                 lines.append("**推薦上位:**")

@@ -67,5 +67,8 @@ sync:
   actions:
     mode: "digest-only"  # digest-only or apply
 
+notes:
+  template_path: "configs/note_template.md"
+
 analytics:
   default_clusters: 5
