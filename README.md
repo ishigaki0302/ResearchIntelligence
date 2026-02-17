@@ -1,4 +1,4 @@
-# Research Intelligence (ri) — v0.5
+# Research Intelligence (ri) — v0.6
 
 ローカル論文管理 + 検索 + 可視化システム。LaTeX/BibTeX ワークフロー向け。
 
@@ -8,16 +8,30 @@
 - **冪等な取り込み**: 同じ論文を2回インポートしても重複なし
 - **ハイブリッド検索**: BM25（SQLite FTS5）+ ベクトル類似度（FAISS + sentence-transformers）
 - **チャンク検索**: テキストをチャンク分割 → チャンク単位のベクトル検索で精密ヒット
+- **検索フィルタ**: 年、venue、タグ、種別で絞り込み
 - **BibTeX エクスポート**: venue/year/tag/collection でフィルタ → `.bib` 出力
 - **ノート**: 論文ごとに Markdown ノートを自動生成、Web UI で編集可能
-- **引用グラフ**: ローカルサブグラフの可視化（D3.js）、References/Cited-by テーブル表示
-- **Inbox レコメンド**: スコアリングによる推薦 + 自動タグ付与
+- **引用グラフ**: Semantic Scholar API 経由のメタデータベース引用構築 + PDF テキストからの参照抽出
+- **Inbox レコメンド**: スコアリングによる推薦 + 自動タグ付与 + 自動承認
+- **重複検出**: DOI/arXiv/タイトル類似度による重複検出 + マージ
 - **定期同期 (sync)**: watch + recommend をまとめて実行（ローカル cron / GitHub Actions 対応）
-- **週次ダイジェスト**: 新着・推薦・キーフレーズの Markdown レポート自動生成
+- **週次ダイジェスト**: 新着・推薦・キーフレーズの Markdown レポート自動生成（GitHub Issue 公開対応）
 - **高度な分析**: トピッククラスタリング（TF-IDF + KMeans）+ 引用ネットワーク分析（PageRank、コミュニティ検出）
 - **バックアップ/マイグレーション**: DB + データの zip バックアップ、スキーマバージョン管理
 - **Web UI**: FastAPI + Jinja2 + HTMX
 - **CLI**: `ri` コマンド（Typer）
+
+### v0.6 の新機能
+
+- **メタデータベース引用構築**: PDF なしで Semantic Scholar API 経由の引用関係を構築（`ri build-citations`）
+- **PDF ダウンロード + 引用抽出の一括実行**: `ri download-pdf --id <ID> --extract` でダウンロード → テキスト抽出 → 参照抽出 → 引用解決を一括実行
+- **Web UI からの PDF 取得 & 引用抽出**: アイテム詳細ページにワンクリックボタン追加
+- **検索タグ絞り込み**: 検索ページにタグドロップダウンフィルタ追加
+- **Inbox 自動承認**: 品質スコアベースの自動承認パイプライン（`ri inbox auto-accept`）
+- **重複検出 & マージ**: `ri dedup detect` / `ri dedup merge`
+- **ノートテンプレート**: 論文ノートの自動生成テンプレート
+- **ジョブ履歴ページ**: Web UI `/jobs` でジョブ実行履歴を確認
+- **GitHub Actions ダイジェスト公開**: sync ワークフローから GitHub Issue にダイジェストを公開
 
 ### v0.5 の新機能
 
@@ -151,7 +165,29 @@ ri analytics export --out trends.json
 Web UI の `/analytics` ページでも確認できます。クラスタ概要、影響力の高い論文（PageRank）、
 コミュニティ検出結果が表示されます。
 
-### 8. バックアップとマイグレーション（v0.5 新機能）
+### 8. 引用構築（v0.6 新機能）
+
+```bash
+# Semantic Scholar API 経由でメタデータベースの引用関係を構築（PDF不要）
+ri build-citations
+ri build-citations --id 42        # 個別アイテム指定
+ri build-citations --limit 100    # 処理件数制限
+
+# PDF ダウンロード + テキスト抽出 + 参照抽出を一括実行
+ri download-pdf --id 42 --extract
+```
+
+Web UI のアイテム詳細ページでも「PDF取得＆引用抽出」ボタンから実行可能です。
+
+### 9. 重複検出 & マージ（v0.6 新機能）
+
+```bash
+ri dedup detect                    # 重複候補を表示
+ri dedup merge 123 456 --dry-run   # マージのプレビュー
+ri dedup merge 123 456 --apply     # 実際にマージ実行
+```
+
+### 10. バックアップとマイグレーション（v0.5 新機能）
 
 ```bash
 # バックアップ作成
@@ -165,14 +201,14 @@ ri backup restore backup.zip
 ri migrate
 ```
 
-### 9. BibTeX エクスポート
+### 11. BibTeX エクスポート
 
 ```bash
 ri export-bib -o references.bib
 ri export-bib --venue ACL --year 2024 -o acl2024.bib
 ```
 
-### 10. Web UI
+### 12. Web UI
 
 ```bash
 ri serve
@@ -181,21 +217,24 @@ ri serve
 
 ページ一覧:
 - **ホーム**: 統計、最近のアイテム、コレクション
-- **検索**: ハイブリッド検索（年、venue、タイプでフィルタ）
-- **アイテム詳細**: メタデータ、要旨、BibTeX、タグ、ノートエディタ
+- **検索**: ハイブリッド検索（年、venue、タグ、タイプでフィルタ）
+- **アイテム詳細**: メタデータ、要旨、BibTeX、タグ、ノートエディタ、PDF取得＆引用抽出
 - **グラフ**: 引用サブグラフ可視化（D3.js）
-- **Inbox**: 発見した論文の承認/却下
+- **Inbox**: 発見した論文の承認/却下/自動承認
 - **Watches**: ウォッチの管理・実行
+- **ジョブ履歴**: パイプライン実行履歴
 - **分析**: トレンド + クラスタ + 引用ネットワーク
 
 ### エンドツーエンド ワークフロー
 
 ```bash
 ri import "acl:2024{main,findings}"                  # インポート
+ri enrich --limit 100                                 # 外部 ID 付与
+ri build-citations --limit 100                        # メタデータベース引用構築
 ri download-pdf --collection "ACL 2024 (main,findings)" --max 100
 ri index --chunks                                     # 検索インデックス構築
-ri extract-references --limit 100                     # 参照抽出
-ri enrich --limit 100                                 # 外部 ID 付与
+ri extract-references --limit 100                     # PDF からの参照抽出
+ri dedup detect                                       # 重複チェック
 ri watch add --name rag --source arxiv --query "RAG" --category cs.CL
 ri sync run --since 7d --out digest.md                # 同期 + ダイジェスト
 ri analytics cluster                                  # トピック分析
@@ -223,6 +262,8 @@ repo/
 │   ├── pipelines/
 │   │   ├── sync.py             # 同期パイプライン（v0.5）
 │   │   ├── backup.py           # バックアップ（v0.5）
+│   │   ├── auto_accept.py      # Inbox 自動承認（v0.6）
+│   │   ├── dedup.py            # 重複検出 & マージ（v0.6）
 │   │   ├── watch.py            # ウォッチパイプライン
 │   │   ├── inbox_recommend.py  # Inbox レコメンド
 │   │   └── ...
@@ -240,7 +281,7 @@ repo/
 ├── configs/config.yaml         # アプリ設定
 ├── data/                       # ライブラリ + キャッシュ
 ├── db/app.sqlite               # SQLite データベース
-├── tests/                      # pytest テスト（88件）
+├── tests/                      # pytest テスト（118件）
 ├── CHANGELOG.md
 ├── pyproject.toml
 └── README.md
@@ -278,7 +319,7 @@ analytics:
 ## テスト
 
 ```bash
-pytest tests/ -v          # 全テスト実行（88件）
+pytest tests/ -v          # 全テスト実行（118件）
 ruff check app/ tests/    # Lint
 black --check app/ tests/ # フォーマットチェック
 ```
