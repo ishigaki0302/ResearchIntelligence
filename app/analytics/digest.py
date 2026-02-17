@@ -161,38 +161,38 @@ def _render_markdown(data: dict, watch_name: str | None = None) -> str:
     summary = data["summary"]
     period = data["period_days"]
 
-    title = f"Research Intelligence Digest — Last {period} days"
+    title = f"Research Intelligence ダイジェスト — 直近 {period} 日間"
     if watch_name:
-        title += f" (watch: {watch_name})"
+        title += f"（watch: {watch_name}）"
     lines.append(f"# {title}")
     lines.append("")
-    lines.append(f"Generated: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}")
+    lines.append(f"生成日時: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}")
     lines.append("")
 
     # Summary
-    lines.append("## Summary")
+    lines.append("## サマリー")
     lines.append("")
-    lines.append("| Metric | Count |")
-    lines.append("|--------|-------|")
-    lines.append(f"| Discovered | {summary['total_discovered']} |")
-    lines.append(f"| Recommended | {summary['total_recommended']} |")
-    lines.append(f"| Accepted | {summary['total_accepted']} |")
-    lines.append(f"| Rejected | {summary['total_rejected']} |")
-    lines.append(f"| Pending | {summary['total_new']} |")
+    lines.append("| 項目 | 件数 |")
+    lines.append("|------|------|")
+    lines.append(f"| 発見 | {summary['total_discovered']} |")
+    lines.append(f"| 推薦 | {summary['total_recommended']} |")
+    lines.append(f"| 承認 | {summary['total_accepted']} |")
+    lines.append(f"| 却下 | {summary['total_rejected']} |")
+    lines.append(f"| 未処理 | {summary['total_new']} |")
     lines.append("")
 
     # By watch
     if data["by_watch"]:
-        lines.append("## By Watch")
+        lines.append("## Watch 別")
         lines.append("")
         for wname, ws in data["by_watch"].items():
             lines.append(f"### {wname}")
             lines.append(
-                f"Discovered: {ws['discovered']} | Recommended: {ws['recommended']} " f"| Accepted: {ws['accepted']}"
+                f"発見: {ws['discovered']} | 推薦: {ws['recommended']} | 承認: {ws['accepted']}"
             )
             lines.append("")
             if ws["top_recommended"]:
-                lines.append("**Top recommended:**")
+                lines.append("**推薦上位:**")
                 lines.append("")
                 for i, rec in enumerate(ws["top_recommended"], 1):
                     venue = f" ({rec['venue']})" if rec.get("venue") else ""
@@ -203,7 +203,7 @@ def _render_markdown(data: dict, watch_name: str | None = None) -> str:
 
     # Keywords
     if data["keywords"]:
-        lines.append("## Top Keywords")
+        lines.append("## 上位キーワード")
         lines.append("")
         for kw in data["keywords"]:
             lines.append(f"- **{kw['phrase']}** ({kw['score']})")

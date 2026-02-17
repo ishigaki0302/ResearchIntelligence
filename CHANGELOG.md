@@ -1,107 +1,107 @@
-# Changelog
+# 変更履歴
 
-All notable changes to this project will be documented in this file.
+このプロジェクトの主な変更をこのファイルに記録します。
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
+フォーマットは [Keep a Changelog](https://keepachangelog.com/ja/1.1.0/) に基づいています。
 
 ## [Unreleased]
 
 ## [0.5.0] - 2026-02-17
 
-### Added
-- **Auto-sync pipeline (P12)**: Scheduled watch + recommend execution
+### 追加
+- **自動同期パイプライン (P12)**: Watch の定期実行 + レコメンド
   - `ri sync run [--since 7d] [--watch <name>] [--recommend] [--out digest.md]`
-  - `ri sync status` shows recent sync jobs
-  - `ri sync digest` displays latest digest
-  - Job recording with summary (counts, duration, failures)
-  - `.github/workflows/sync.yml` for GitHub Actions (schedule + workflow_dispatch)
-  - Sync config in `config.yaml` (enable, default_since_days, output_dir, actions.mode)
-- **Weekly digest (P13)**: Markdown report generation for discoveries
+  - `ri sync status` で直近の同期ジョブを表示
+  - `ri sync digest` で最新ダイジェストを表示
+  - ジョブ記録（件数・実行時間・失敗情報のサマリー付き）
+  - `.github/workflows/sync.yml` による GitHub Actions 対応（スケジュール + 手動実行）
+  - `config.yaml` に sync 設定を追加（enable, default_since_days, output_dir, actions.mode）
+- **週次ダイジェスト (P13)**: 発見論文の Markdown レポート生成
   - `ri digest weekly --since 7d --out digest.md`
   - `ri digest watch --name <name> --since 14d`
-  - Summary: total discovered/recommended/accepted by watch
-  - Top recommended papers per watch with scores
-  - TF-IDF keyword extraction from inbox items
-  - Outputs both Markdown and JSON
-- **Advanced analytics (P14)**: Topic clustering and citation network analysis
+  - サマリー: Watch 別の発見数・推薦数・承認数
+  - Watch 別のスコア上位推薦論文
+  - Inbox アイテムからの TF-IDF キーワード抽出
+  - Markdown + JSON の両形式で出力
+- **高度な分析 (P14)**: トピッククラスタリングと引用ネットワーク分析
   - `ri analytics cluster [--clusters N] [--out clusters.json]`
-  - TF-IDF + KMeans clustering with top terms and representative papers
+  - TF-IDF + KMeans によるクラスタリング（上位キーワード・代表論文付き）
   - `ri analytics graph-stats [--out graph.json]`
-  - Citation network: in-degree, out-degree, PageRank, community detection
-  - `/analytics` now shows Cluster Overview, Influential Papers, and Communities
-- **Operations quality (P15)**: Backup, migration, and observability
+  - 引用ネットワーク: 被引用数、引用数、PageRank、コミュニティ検出
+  - `/analytics` にクラスタ概要・影響力のある論文・コミュニティを表示
+- **運用品質 (P15)**: バックアップ、マイグレーション、可観測性
   - `ri backup create --out backup.zip [--no-pdf] [--no-cache]`
-  - `ri backup restore <backup.zip>` (shows restore instructions)
-  - `ri migrate` applies pending DB migrations
-  - `schema_version` table tracks applied migrations
-  - Jobs table now includes `summary_json`, `started_at`, `finished_at`
-  - 19 new tests (88 total), all passing
+  - `ri backup restore <backup.zip>`（復元手順を表示）
+  - `ri migrate` で未適用の DB マイグレーションを実行
+  - `schema_version` テーブルで適用済みマイグレーションを追跡
+  - Job テーブルに `summary_json`, `started_at`, `finished_at` を追加
+  - テスト 19 件追加（合計 88 件、全件パス）
 
-### Changed
-- Migration framework replaces ad-hoc `_migrate_add_columns` with versioned migrations
-- Added `networkx>=3.1` dependency for citation network analysis
-- Updated version to 0.5.0
+### 変更
+- マイグレーションフレームワークをアドホックな `_migrate_add_columns` からバージョン管理方式に刷新
+- 引用ネットワーク分析のため `networkx>=3.1` を依存関係に追加
+- バージョンを 0.5.0 に更新
 
 ## [0.4.0] - 2026-02-17
 
-### Added
-- **Chunk embeddings (P8)**: Fine-grained vector search over text chunks
-  - `Chunk` model for splitting item texts into searchable segments
-  - Heading-aware text chunking (`app/indexing/chunker.py`)
-  - Separate FAISS index for chunk embeddings
-  - `ri index --chunks` to build chunk index
-  - `ri search --scope both` to search items and chunks together
-  - Chunk hit preview in web search results and item detail
-- **Citation quality improvements (P9)**: Better reference extraction and resolution
-  - Multi-pattern reference extraction (bracket, numbered-dot, paragraph)
-  - Multi-ID extraction: DOI, arXiv, ACL Anthology, OpenReview, URL, ISBN
-  - Hash-based citation dedup (re-runnable without duplicates)
-  - Enhanced resolution: bibtex_key, DOI, arXiv, ACL, URL, title fallback
-  - Resolution stats with method breakdown
-  - Depth-2 citation subgraph support
-  - Tabbed References/Cited-by/Graph view on item detail
-  - Unresolved references shown on item detail
-- **Inbox automation (P10)**: Recommendation scoring and auto-tagging
-  - `ri inbox recommend` scores inbox items by relevance, venue, author overlap, recency
-  - Auto-tag suggestions from watch name, venue, and query keywords
-  - "Recommended" filter in web inbox
-  - Auto-tags applied on accept
-- **DevOps quality (P11)**: CI/CD hardening
-  - `CODEOWNERS` file
-  - Dependabot for pip and GitHub Actions
-  - Benchmark test in CI (warn-only)
+### 追加
+- **チャンク埋め込み (P8)**: テキストチャンク単位の精密なベクトル検索
+  - `Chunk` モデルによるアイテムテキストの分割・検索
+  - 見出し対応のテキストチャンキング (`app/indexing/chunker.py`)
+  - チャンク埋め込み用の独立した FAISS インデックス
+  - `ri index --chunks` でチャンクインデックスを構築
+  - `ri search --scope both` でアイテムとチャンクを横断検索
+  - Web 検索結果とアイテム詳細でチャンクヒットをプレビュー
+- **引用品質向上 (P9)**: 参考文献の抽出・解決の改善
+  - 複数パターンの参考文献抽出（括弧、番号付きドット、段落）
+  - 複数 ID 抽出: DOI, arXiv, ACL Anthology, OpenReview, URL, ISBN
+  - ハッシュベースの引用重複排除（再実行可能、重複なし）
+  - 解決強化: bibtex_key, DOI, arXiv, ACL, URL, タイトルフォールバック
+  - 解決方法の内訳付き解決統計
+  - 深さ 2 の引用サブグラフ対応
+  - アイテム詳細で参照/被引用/グラフのタブ表示
+  - アイテム詳細で未解決の参考文献を表示
+- **Inbox 自動化 (P10)**: レコメンドスコアリングと自動タグ付け
+  - `ri inbox recommend` で関連性・会場・著者重複・新しさに基づきスコアリング
+  - Watch 名・会場・クエリキーワードからの自動タグ候補
+  - Web Inbox に「推薦」フィルター
+  - 承認時に自動タグを適用
+- **DevOps 品質 (P11)**: CI/CD の強化
+  - `CODEOWNERS` ファイル
+  - pip と GitHub Actions 用の Dependabot
+  - CI でのベンチマークテスト（警告のみ）
 
-### Changed
-- `hybrid_search()` now accepts `scope` parameter: "item", "chunk", or "both"
-- `extract_references_for_item()` uses hash-based dedup instead of skip-all-if-any-exist
-- `resolve_citations()` returns detailed stats with method breakdown
-- `get_citation_subgraph()` includes `unresolved_refs` and supports `depth` parameter
-- Updated version to 0.4.0
+### 変更
+- `hybrid_search()` に `scope` パラメータを追加: "item", "chunk", "both"
+- `extract_references_for_item()` のスキップ方式をハッシュベース重複排除に変更
+- `resolve_citations()` が解決方法の内訳付き詳細統計を返すよう変更
+- `get_citation_subgraph()` に `unresolved_refs` と `depth` パラメータを追加
+- バージョンを 0.4.0 に更新
 
 ## [0.3.0] - 2026-02-17
 
-### Added
-- Watchlist system for continuous paper ingestion (arXiv, OpenAlex)
-- Inbox for reviewing discovered papers (accept/reject workflow)
-- Trend analytics dashboard (year x venue, keyphrases, collection growth)
-- CLI commands: `ri watch add/list/run`, `ri inbox list/accept/reject`, `ri analytics export`
-- Web UI pages: `/watches`, `/inbox`, `/analytics`
-- GitHub Actions CI (pytest, ruff, black) and tag-triggered releases
-- Issue and PR templates
+### 追加
+- 継続的な論文収集のための Watchlist システム（arXiv, OpenAlex）
+- 発見した論文のレビュー用 Inbox（承認/却下ワークフロー）
+- トレンド分析ダッシュボード（年×会場、キーフレーズ、コレクション成長）
+- CLI コマンド: `ri watch add/list/run`, `ri inbox list/accept/reject`, `ri analytics export`
+- Web UI ページ: `/watches`, `/inbox`, `/analytics`
+- GitHub Actions CI（pytest, ruff, black）とタグトリガーのリリース
+- Issue と PR のテンプレート
 
-### Changed
-- Updated version to 0.3.0
+### 変更
+- バージョンを 0.3.0 に更新
 
 ## [0.2.0] - 2025-01-01
 
-### Added
-- Core item management with idempotent upsert
-- ACL Anthology connector with BibTeX import
-- OpenAlex and Semantic Scholar enrichment
-- BM25 (FTS5) + FAISS hybrid search
-- PDF download pipeline
-- Reference extraction and citation graph
-- Tag management (CLI + web)
-- BibTeX export with filters
-- Web UI with search, item detail, notes, collections, citation graph
-- 41 passing tests
+### 追加
+- 冪等 upsert によるコアアイテム管理
+- ACL Anthology コネクタ（BibTeX インポート）
+- OpenAlex と Semantic Scholar によるエンリッチメント
+- BM25 (FTS5) + FAISS ハイブリッド検索
+- PDF ダウンロードパイプライン
+- 参考文献抽出と引用グラフ
+- タグ管理（CLI + Web）
+- フィルター付き BibTeX エクスポート
+- Web UI（検索、アイテム詳細、ノート、コレクション、引用グラフ）
+- テスト 41 件パス

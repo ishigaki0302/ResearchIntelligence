@@ -4,14 +4,14 @@
 <h1>Inbox</h1>
 
 <div class="filter-row" style="margin-bottom:1rem; display:flex; gap:0.5rem; align-items:center;">
-    <label>Status:</label>
-    <a href="/inbox?status=new" class="btn {% if current_status == 'new' %}{% else %}btn-secondary{% endif %}" style="font-size:0.8rem; padding:0.3rem 0.6rem;">New</a>
-    <a href="/inbox?status=recommended" class="btn {% if current_status == 'recommended' %}{% else %}btn-secondary{% endif %}" style="font-size:0.8rem; padding:0.3rem 0.6rem;">Recommended</a>
-    <a href="/inbox?status=accepted" class="btn btn-secondary" style="font-size:0.8rem; padding:0.3rem 0.6rem;">Accepted</a>
-    <a href="/inbox?status=rejected" class="btn btn-secondary" style="font-size:0.8rem; padding:0.3rem 0.6rem;">Rejected</a>
-    <a href="/inbox?status=all" class="btn btn-secondary" style="font-size:0.8rem; padding:0.3rem 0.6rem;">All</a>
+    <label>ステータス:</label>
+    <a href="/inbox?status=new" class="btn {% if current_status == 'new' %}{% else %}btn-secondary{% endif %}" style="font-size:0.8rem; padding:0.3rem 0.6rem;">新着</a>
+    <a href="/inbox?status=recommended" class="btn {% if current_status == 'recommended' %}{% else %}btn-secondary{% endif %}" style="font-size:0.8rem; padding:0.3rem 0.6rem;">推薦</a>
+    <a href="/inbox?status=accepted" class="btn btn-secondary" style="font-size:0.8rem; padding:0.3rem 0.6rem;">承認済み</a>
+    <a href="/inbox?status=rejected" class="btn btn-secondary" style="font-size:0.8rem; padding:0.3rem 0.6rem;">却下済み</a>
+    <a href="/inbox?status=all" class="btn btn-secondary" style="font-size:0.8rem; padding:0.3rem 0.6rem;">すべて</a>
     <form method="post" action="/inbox/recommend" style="margin-left:auto;">
-        <button type="submit" class="btn btn-secondary" style="font-size:0.8rem; padding:0.3rem 0.6rem;">Run Recommend</button>
+        <button type="submit" class="btn btn-secondary" style="font-size:0.8rem; padding:0.3rem 0.6rem;">レコメンド実行</button>
     </form>
 </div>
 
@@ -21,16 +21,16 @@
     <h3>
         {{ it.title }}
         {% if it.recommended %}
-        <span class="badge" style="background:#28a745; color:white; font-size:0.7em; margin-left:0.3rem;">Recommended</span>
+        <span class="badge" style="background:#28a745; color:white; font-size:0.7em; margin-left:0.3rem;">推薦</span>
         {% endif %}
     </h3>
     <p class="meta">
         {{ it.source_id_type }}:{{ it.source_id_value }}
-        | Year: {{ it.year or "?" }}
+        | 年: {{ it.year or "?" }}
         {% if it.venue %}| {{ it.venue }}{% endif %}
-        | Status: <span class="badge">{{ it.status }}</span>
+        | ステータス: <span class="badge">{{ it.status }}</span>
         {% if it.recommend_score is not none %}
-        | Score: {{ "%.2f"|format(it.recommend_score) }}
+        | スコア: {{ "%.2f"|format(it.recommend_score) }}
         {% endif %}
     </p>
     {% if it.recommended and it.reasons_json %}
@@ -53,14 +53,14 @@
             {% if it.auto_tags_json and it.auto_tags_json != '[]' %}
             <input type="hidden" name="apply_tags" value="1">
             {% endif %}
-            <button type="submit" style="font-size:0.8rem; padding:0.3rem 0.6rem;">Accept</button>
+            <button type="submit" style="font-size:0.8rem; padding:0.3rem 0.6rem;">承認</button>
         </form>
         <form method="post" action="/inbox/{{ it.id }}/reject">
-            <button type="submit" class="btn-secondary" style="font-size:0.8rem; padding:0.3rem 0.6rem;">Reject</button>
+            <button type="submit" class="btn-secondary" style="font-size:0.8rem; padding:0.3rem 0.6rem;">却下</button>
         </form>
         {% if it.auto_tags_json and it.auto_tags_json != '[]' %}
         <span style="font-size:0.8em; color:#666;">
-            Auto-tags:
+            自動タグ:
             {% for tag in it.auto_tags_json|replace('[','') |replace(']','')|replace('"','')|split(',') %}
                 {% if tag.strip() %}<code>{{ tag.strip() }}</code> {% endif %}
             {% endfor %}
@@ -71,6 +71,6 @@
 </div>
 {% endfor %}
 {% else %}
-<p class="meta">No inbox items (status={{ current_status }}).</p>
+<p class="meta">Inbox アイテムがありません（ステータス: {{ current_status }}）。</p>
 {% endif %}
 {% endblock %}

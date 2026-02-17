@@ -1,20 +1,20 @@
 {% extends "base.html" %}
-{% block title %}Analytics — Research Intelligence{% endblock %}
+{% block title %}分析 — Research Intelligence{% endblock %}
 {% block content %}
-<h1>Analytics</h1>
+<h1>分析</h1>
 
-<h2>Cluster Overview</h2>
+<h2>クラスタ概要</h2>
 {% if cluster_data and cluster_data.clusters %}
-<p class="meta">{{ cluster_data.total_items }} items in {{ cluster_data.n_clusters }} clusters</p>
+<p class="meta">{{ cluster_data.total_items }} 件を {{ cluster_data.n_clusters }} クラスタに分類</p>
 {% for c in cluster_data.clusters %}
 <div class="card" style="margin-bottom:1rem;">
-    <h3>Cluster {{ c.id }} ({{ c.size }} items)</h3>
-    <p><strong>Topics:</strong>
+    <h3>クラスタ {{ c.id }}（{{ c.size }} 件）</h3>
+    <p><strong>トピック:</strong>
     {% for t in c.top_terms[:5] %}
         <span class="badge" style="margin:0.15rem;">{{ t }}</span>
     {% endfor %}
     </p>
-    <p><strong>Representative papers:</strong></p>
+    <p><strong>代表的な論文:</strong></p>
     <ul>
     {% for item in c.representative_items[:3] %}
         <li><a href="/item/{{ item.id }}">{{ item.title }}</a>
@@ -26,18 +26,18 @@
 </div>
 {% endfor %}
 {% else %}
-<p class="meta">Not enough data for clustering.</p>
+<p class="meta">クラスタリングに十分なデータがありません。</p>
 {% endif %}
 
-<h2>Influential Papers (Citation Network)</h2>
+<h2>影響力のある論文（引用ネットワーク）</h2>
 {% if network_data and network_data.node_count > 0 %}
-<p class="meta">{{ network_data.node_count }} nodes, {{ network_data.edge_count }} edges</p>
+<p class="meta">{{ network_data.node_count }} ノード、{{ network_data.edge_count }} エッジ</p>
 
-<h3>Top Cited (In-degree)</h3>
+<h3>被引用数ランキング</h3>
 <table class="card" style="width:100%; border-collapse:collapse;">
     <tr style="border-bottom:1px solid var(--border);">
-        <th style="text-align:left; padding:0.5rem;">Paper</th>
-        <th style="text-align:right; padding:0.5rem;">Citations</th>
+        <th style="text-align:left; padding:0.5rem;">論文</th>
+        <th style="text-align:right; padding:0.5rem;">被引用数</th>
     </tr>
     {% for item in network_data.top_in_degree[:10] %}
     <tr style="border-bottom:1px solid var(--border);">
@@ -50,10 +50,10 @@
 </table>
 
 {% if network_data.top_pagerank %}
-<h3>Top PageRank</h3>
+<h3>PageRank ランキング</h3>
 <table class="card" style="width:100%; border-collapse:collapse;">
     <tr style="border-bottom:1px solid var(--border);">
-        <th style="text-align:left; padding:0.5rem;">Paper</th>
+        <th style="text-align:left; padding:0.5rem;">論文</th>
         <th style="text-align:right; padding:0.5rem;">PageRank</th>
     </tr>
     {% for item in network_data.top_pagerank[:10] %}
@@ -66,13 +66,13 @@
 {% endif %}
 
 {% if network_data.communities %}
-<h3>Communities ({{ network_data.community_count }} detected)</h3>
+<h3>コミュニティ（{{ network_data.community_count }} 件検出）</h3>
 {% for comm in network_data.communities[:5] %}
 <div class="card" style="margin-bottom:0.5rem;">
-    <strong>Community {{ comm.id }}</strong> ({{ comm.size }} papers)
+    <strong>コミュニティ {{ comm.id }}</strong>（{{ comm.size }} 件）
     <ul>
     {% for m in comm.top_members[:3] %}
-        <li><a href="/item/{{ m.id }}">{{ m.title[:70] }}</a> <span class="meta">(cited: {{ m.in_degree }})</span></li>
+        <li><a href="/item/{{ m.id }}">{{ m.title[:70] }}</a> <span class="meta">（被引用: {{ m.in_degree }}）</span></li>
     {% endfor %}
     </ul>
 </div>
@@ -80,16 +80,16 @@
 {% endif %}
 
 {% else %}
-<p class="meta">No citation data available.</p>
+<p class="meta">引用データがありません。</p>
 {% endif %}
 
-<h2>Year x Venue</h2>
+<h2>年 × 会場</h2>
 {% if data.year_venue %}
 <table class="card" style="width:100%; border-collapse:collapse;">
     <tr style="border-bottom:1px solid var(--border);">
-        <th style="text-align:left; padding:0.5rem;">Year</th>
-        <th style="text-align:left; padding:0.5rem;">Venue</th>
-        <th style="text-align:right; padding:0.5rem;">Count</th>
+        <th style="text-align:left; padding:0.5rem;">年</th>
+        <th style="text-align:left; padding:0.5rem;">会場</th>
+        <th style="text-align:right; padding:0.5rem;">件数</th>
     </tr>
     {% for row in data.year_venue %}
     <tr style="border-bottom:1px solid var(--border);">
@@ -100,16 +100,16 @@
     {% endfor %}
 </table>
 {% else %}
-<p class="meta">No data.</p>
+<p class="meta">データがありません。</p>
 {% endif %}
 
-<h2>Year x Collection</h2>
+<h2>年 × コレクション</h2>
 {% if data.year_collection %}
 <table class="card" style="width:100%; border-collapse:collapse;">
     <tr style="border-bottom:1px solid var(--border);">
-        <th style="text-align:left; padding:0.5rem;">Year</th>
-        <th style="text-align:left; padding:0.5rem;">Collection</th>
-        <th style="text-align:right; padding:0.5rem;">Count</th>
+        <th style="text-align:left; padding:0.5rem;">年</th>
+        <th style="text-align:left; padding:0.5rem;">コレクション</th>
+        <th style="text-align:right; padding:0.5rem;">件数</th>
     </tr>
     {% for row in data.year_collection %}
     <tr style="border-bottom:1px solid var(--border);">
@@ -120,16 +120,16 @@
     {% endfor %}
 </table>
 {% else %}
-<p class="meta">No data.</p>
+<p class="meta">データがありません。</p>
 {% endif %}
 
-<h2>Year x Tag</h2>
+<h2>年 × タグ</h2>
 {% if data.year_tag %}
 <table class="card" style="width:100%; border-collapse:collapse;">
     <tr style="border-bottom:1px solid var(--border);">
-        <th style="text-align:left; padding:0.5rem;">Year</th>
-        <th style="text-align:left; padding:0.5rem;">Tag</th>
-        <th style="text-align:right; padding:0.5rem;">Count</th>
+        <th style="text-align:left; padding:0.5rem;">年</th>
+        <th style="text-align:left; padding:0.5rem;">タグ</th>
+        <th style="text-align:right; padding:0.5rem;">件数</th>
     </tr>
     {% for row in data.year_tag %}
     <tr style="border-bottom:1px solid var(--border);">
@@ -140,16 +140,16 @@
     {% endfor %}
 </table>
 {% else %}
-<p class="meta">No data.</p>
+<p class="meta">データがありません。</p>
 {% endif %}
 
-<h2>Watch Collection Growth</h2>
+<h2>Watch コレクション成長</h2>
 {% if data.watch_growth %}
 <table class="card" style="width:100%; border-collapse:collapse;">
     <tr style="border-bottom:1px solid var(--border);">
-        <th style="text-align:left; padding:0.5rem;">Collection</th>
-        <th style="text-align:left; padding:0.5rem;">Date</th>
-        <th style="text-align:right; padding:0.5rem;">Cumulative</th>
+        <th style="text-align:left; padding:0.5rem;">コレクション</th>
+        <th style="text-align:left; padding:0.5rem;">日付</th>
+        <th style="text-align:right; padding:0.5rem;">累計</th>
     </tr>
     {% for row in data.watch_growth %}
     <tr style="border-bottom:1px solid var(--border);">
@@ -160,10 +160,10 @@
     {% endfor %}
 </table>
 {% else %}
-<p class="meta">No watch collections yet.</p>
+<p class="meta">Watch コレクションがまだありません。</p>
 {% endif %}
 
-<h2>Top Keyphrases by Year</h2>
+<h2>年別キーフレーズ</h2>
 {% if data.keyphrases %}
 {% set ns = namespace(current_year=0) %}
 {% for row in data.keyphrases %}
@@ -177,7 +177,7 @@
 {% endfor %}
 {% if data.keyphrases %}</div>{% endif %}
 {% else %}
-<p class="meta">Not enough data for keyphrase extraction (need 2+ items per year).</p>
+<p class="meta">キーフレーズ抽出に十分なデータがありません（年あたり2件以上必要）。</p>
 {% endif %}
 
 {% endblock %}
