@@ -32,8 +32,11 @@ def _get_headers() -> dict:
 
 
 def _cached_get(url: str, params: dict | None = None) -> dict | None:
-    """GET with file caching."""
-    cache_key = hashlib.md5(url.encode()).hexdigest()
+    """GET with file caching.  Cache key includes both URL and params."""
+    key_src = url
+    if params:
+        key_src += "?" + json.dumps(params, sort_keys=True)
+    cache_key = hashlib.md5(key_src.encode()).hexdigest()
     cache_file = _cache_dir() / f"{cache_key}.json"
     if cache_file.exists():
         data = json.loads(cache_file.read_text(encoding="utf-8"))
@@ -44,6 +47,11 @@ def _cached_get(url: str, params: dict | None = None) -> dict | None:
         if resp.status_code == 404:
             cache_file.write_text("null", encoding="utf-8")
             return None
+        if resp.status_code == 429:
+            logger.warning("Semantic Scholar rate limit hit, waiting 3s...")
+            import time
+            time.sleep(3)
+            resp = requests.get(url, params=params, headers=_get_headers(), timeout=30)
         resp.raise_for_status()
         data = resp.json()
         cache_file.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
@@ -85,26 +93,57 @@ def search_s2_by_title(title: str) -> list[dict]:
         return []
 
 
-def get_references(paper_id: str) -> list[dict]:
-    """Get references for a paper from Semantic Scholar.
-
-    Args:
-        paper_id: S2 paper identifier (e.g. "DOI:10.xxx", "ARXIV:2401.xxx", or CorpusId)
-
-    Returns:
-        List of referenced paper dicts with externalIds and title.
-    """
+def _fetch_references(paper_id: str) -> list[dict] | None:
+    """Fetch references for a single paper_id. Returns None on miss."""
     url = f"{S2_API}/paper/{paper_id}/references"
     params = {"fields": "externalIds,title", "limit": "1000"}
     data = _cached_get(url, params)
     if not data:
-        return []
+        return None
     refs = []
     for entry in data.get("data", []):
         cited = entry.get("citedPaper")
         if cited and cited.get("paperId"):
             refs.append(cited)
-    return refs
+    return refs if refs else None
+
+
+def get_references(paper_id: str, alt_ids: list[str] | None = None, title: str | None = None) -> list[dict]:
+    """Get references for a paper from Semantic Scholar.
+
+    Tries paper_id first, then alt_ids, then falls back to title search
+    to resolve the S2 paperId.
+
+    Args:
+        paper_id: Primary S2 paper identifier (e.g. "DOI:10.xxx", "ARXIV:2401.xxx")
+        alt_ids: Alternative identifiers to try if primary fails
+        title: Paper title for fallback search
+
+    Returns:
+        List of referenced paper dicts with externalIds and title.
+    """
+    # Try primary
+    refs = _fetch_references(paper_id)
+    if refs:
+        return refs
+
+    # Try alternative IDs
+    for alt in alt_ids or []:
+        refs = _fetch_references(alt)
+        if refs:
+            return refs
+
+    # Fallback: search by title to find paperId, then fetch references
+    if title:
+        results = search_s2_by_title(title)
+        for r in results:
+            pid = r.get("paperId")
+            if pid:
+                refs = _fetch_references(pid)
+                if refs:
+                    return refs
+
+    return []
 
 
 def extract_ids_from_s2(paper: dict) -> dict[str, str]:

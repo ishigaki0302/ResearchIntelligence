@@ -78,16 +78,30 @@ def test_build_citations_dedup(tmp_db):
     assert count == 1
 
 
-def test_build_citations_skips_no_external_id(tmp_db):
-    """Test that items without external IDs are skipped."""
+def test_build_citations_skips_no_external_id_no_title(tmp_db):
+    """Test that items without external IDs and no title are skipped."""
     session = tmp_db
 
-    item = _make_item(session, "No IDs Paper")
+    item = _make_item(session, "")
     session.commit()
 
     result = build_citations_from_metadata(session, items=[item])
     assert result["skipped"] == 1
     assert result["processed"] == 0
+
+
+def test_build_citations_title_fallback_no_match(tmp_db):
+    """Test that items without external IDs try title fallback."""
+    session = tmp_db
+
+    item = _make_item(session, "No IDs Paper")
+    session.commit()
+
+    with patch("app.connectors.semantic_scholar.search_s2_by_title", return_value=[]):
+        result = build_citations_from_metadata(session, items=[item])
+    # Processed but no hits (title search returned nothing)
+    assert result["processed"] == 1
+    assert result["api_misses"] == 1
 
 
 def test_build_citations_arxiv_match(tmp_db):

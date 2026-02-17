@@ -70,19 +70,24 @@ def build_citations_from_metadata(
         id_lookup[(iid.id_type, iid.id_value)] = iid.item_id
 
     for item in items:
-        # Find a suitable S2 paper identifier
+        # Build all available S2 identifiers for this item
         ext_ids = {eid.id_type: eid.id_value for eid in item.external_ids}
-        paper_id = None
+        candidates = []
         if "doi" in ext_ids:
-            paper_id = f"DOI:{ext_ids['doi']}"
-        elif "arxiv" in ext_ids:
-            paper_id = f"ARXIV:{ext_ids['arxiv']}"
-        elif "s2" in ext_ids:
-            paper_id = ext_ids["s2"]
+            candidates.append(f"DOI:{ext_ids['doi']}")
+        if "arxiv" in ext_ids:
+            candidates.append(f"ARXIV:{ext_ids['arxiv']}")
+        if "acl" in ext_ids:
+            candidates.append(f"ACL:{ext_ids['acl']}")
+        if "s2" in ext_ids:
+            candidates.append(ext_ids["s2"])
 
-        if not paper_id:
+        if not candidates and not item.title:
             stats["skipped"] += 1
             continue
+
+        paper_id = candidates[0] if candidates else "NONE:placeholder"
+        alt_ids = candidates[1:] if len(candidates) > 1 else []
 
         # Get existing citation hashes to dedup
         existing_hashes = set(
@@ -97,7 +102,7 @@ def build_citations_from_metadata(
             .all()
         )
 
-        refs = get_references(paper_id)
+        refs = get_references(paper_id, alt_ids=alt_ids, title=item.title)
         if not refs:
             stats["api_misses"] += 1
             stats["processed"] += 1
