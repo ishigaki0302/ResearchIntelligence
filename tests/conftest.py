@@ -1,17 +1,12 @@
 """Test fixtures."""
 
-import tempfile
-from pathlib import Path
-
 import pytest
-
-from app.core.config import REPO_ROOT
 
 
 @pytest.fixture
 def tmp_db(tmp_path):
     """Create a temporary database for testing."""
-    from app.core.db import reset_engine, get_engine, init_db, get_session
+    from app.core.db import get_session, init_db, reset_engine
 
     reset_engine()
     db_path = tmp_path / "test.sqlite"
@@ -21,8 +16,6 @@ def tmp_db(tmp_path):
 
     original_root = cfg_mod.REPO_ROOT
 
-    # Override resolve_path for testing
-    original_resolve = cfg_mod.resolve_path
     cfg_mod.REPO_ROOT = tmp_path
 
     # Create directory structure

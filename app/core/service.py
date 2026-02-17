@@ -6,13 +6,12 @@ Handles CRUD, idempotent upsert, note generation, and author management.
 import json
 import shutil
 from pathlib import Path
-from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.bibtex import generate_bibtex_key, normalize_name
-from app.core.config import resolve_path, get_config
+from app.core.config import get_config, resolve_path
 from app.core.models import (
     Author,
     Citation,
@@ -41,9 +40,7 @@ def _paper_dir(paper_id: int) -> Path:
 def get_or_create_author(session: Session, name: str) -> Author:
     """Find or create an author by normalized name."""
     norm = normalize_name(name)
-    author = session.execute(
-        select(Author).where(Author.norm_name == norm)
-    ).scalar_one_or_none()
+    author = session.execute(select(Author).where(Author.norm_name == norm)).scalar_one_or_none()
     if author is None:
         author = Author(name=name, norm_name=norm)
         session.add(author)
@@ -53,9 +50,7 @@ def get_or_create_author(session: Session, name: str) -> Author:
 
 def get_or_create_tag(session: Session, name: str) -> Tag:
     """Find or create a tag."""
-    tag = session.execute(
-        select(Tag).where(Tag.name == name)
-    ).scalar_one_or_none()
+    tag = session.execute(select(Tag).where(Tag.name == name)).scalar_one_or_none()
     if tag is None:
         tag = Tag(name=name)
         session.add(tag)
@@ -75,9 +70,7 @@ def find_item_by_external_id(session: Session, id_type: str, id_value: str) -> I
 
 def find_item_by_bibtex_key(session: Session, key: str) -> Item | None:
     """Look up an item by its BibTeX key."""
-    return session.execute(
-        select(Item).where(Item.bibtex_key == key)
-    ).scalar_one_or_none()
+    return session.execute(select(Item).where(Item.bibtex_key == key)).scalar_one_or_none()
 
 
 def _collect_existing_bibtex_keys(session: Session) -> set[str]:
@@ -151,9 +144,7 @@ def upsert_item(
         # Generate bibtex_key if not provided
         if not bibtex_key:
             existing_keys = _collect_existing_bibtex_keys(session)
-            bibtex_key = generate_bibtex_key(
-                authors or [], year, title, existing_keys
-            )
+            bibtex_key = generate_bibtex_key(authors or [], year, title, existing_keys)
 
         item = Item(
             type=item_type,
@@ -187,9 +178,7 @@ def upsert_item(
     if external_ids:
         for id_type, id_value in external_ids.items():
             exists = session.execute(
-                select(ItemId).where(
-                    ItemId.id_type == id_type, ItemId.id_value == id_value
-                )
+                select(ItemId).where(ItemId.id_type == id_type, ItemId.id_value == id_value)
             ).scalar_one_or_none()
             if not exists:
                 session.add(ItemId(item_id=item.id, id_type=id_type, id_value=id_value))
@@ -199,9 +188,7 @@ def upsert_item(
         for tag_name in tags:
             tag = get_or_create_tag(session, tag_name)
             exists = session.execute(
-                select(ItemTag).where(
-                    ItemTag.item_id == item.id, ItemTag.tag_id == tag.id
-                )
+                select(ItemTag).where(ItemTag.item_id == item.id, ItemTag.tag_id == tag.id)
             ).scalar_one_or_none()
             if not exists:
                 session.add(ItemTag(item_id=item.id, tag_id=tag.id, source="import"))
@@ -227,9 +214,7 @@ def upsert_item(
 
 def ensure_note(session: Session, item: Item) -> Note:
     """Ensure a main.md note exists for the item."""
-    existing = session.execute(
-        select(Note).where(Note.item_id == item.id, Note.title == "main")
-    ).scalar_one_or_none()
+    existing = session.execute(select(Note).where(Note.item_id == item.id, Note.title == "main")).scalar_one_or_none()
     if existing:
         return existing
 
@@ -250,9 +235,7 @@ def ensure_note(session: Session, item: Item) -> Note:
 
 def get_or_create_collection(session: Session, name: str, spec: dict | None = None) -> Collection:
     """Find or create a collection by name."""
-    coll = session.execute(
-        select(Collection).where(Collection.name == name)
-    ).scalar_one_or_none()
+    coll = session.execute(select(Collection).where(Collection.name == name)).scalar_one_or_none()
     if coll is None:
         coll = Collection(name=name, spec_json=json.dumps(spec) if spec else None)
         session.add(coll)
@@ -303,15 +286,11 @@ def remove_tag_from_item(session: Session, item_id: int, tag_name: str) -> bool:
 
 def list_tags_for_item(session: Session, item_id: int) -> list[str]:
     """Get all tag names for an item."""
-    links = session.execute(
-        select(ItemTag).where(ItemTag.item_id == item_id)
-    ).scalars().all()
+    links = session.execute(select(ItemTag).where(ItemTag.item_id == item_id)).scalars().all()
     tag_ids = [link.tag_id for link in links]
     if not tag_ids:
         return []
-    tags = session.execute(
-        select(Tag).where(Tag.id.in_(tag_ids))
-    ).scalars().all()
+    tags = session.execute(select(Tag).where(Tag.id.in_(tag_ids))).scalars().all()
     return sorted(t.name for t in tags)
 
 

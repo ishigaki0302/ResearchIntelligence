@@ -1,9 +1,6 @@
 """Tests for BibTeX export stability."""
 
 import textwrap
-from pathlib import Path
-
-import pytest
 
 from app.core.service import upsert_item
 from app.pipelines.exporter import export_bibtex
@@ -54,7 +51,7 @@ class TestBibtexExport:
         session.commit()
 
         output = tmp_path / "output.bib"
-        result = export_bibtex(session, output_path=str(output))
+        export_bibtex(session, output_path=str(output))
 
         content = output.read_text()
         assert "@inproceedings{doe2024raw," in content
@@ -88,7 +85,8 @@ class TestBibtexExport:
 
         output = tmp_path / "filtered.bib"
         result = export_bibtex(
-            session, output_path=str(output),
+            session,
+            output_path=str(output),
             filters={"year_from": 2024, "year_to": 2024},
         )
 

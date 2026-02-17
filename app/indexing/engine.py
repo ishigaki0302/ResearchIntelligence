@@ -26,13 +26,10 @@ def rebuild_fts(session: Session):
     conn.execute(text("DROP TABLE IF EXISTS notes_fts"))
     conn.execute(
         text(
-            "CREATE VIRTUAL TABLE items_fts USING fts5("
-            "title, abstract, content, content='', content_rowid='rowid')"
+            "CREATE VIRTUAL TABLE items_fts USING fts5(" "title, abstract, content, content='', content_rowid='rowid')"
         )
     )
-    conn.execute(
-        text("CREATE VIRTUAL TABLE notes_fts USING fts5(title, body, content='', content_rowid='rowid')")
-    )
+    conn.execute(text("CREATE VIRTUAL TABLE notes_fts USING fts5(title, body, content='', content_rowid='rowid')"))
 
     # Index items
     items = session.execute(select(Item)).scalars().all()

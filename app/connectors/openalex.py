@@ -8,9 +8,8 @@ import unicodedata
 from pathlib import Path
 
 import requests
-from sqlalchemy.orm import Session
 
-from app.core.config import resolve_path, get_config
+from app.core.config import get_config, resolve_path
 
 logger = logging.getLogger(__name__)
 
@@ -165,16 +164,18 @@ def search_openalex_works(
             word_positions.sort()
             abstract = " ".join(w for _, w in word_positions)
 
-        normalized.append({
-            "source_id_type": source_id_type,
-            "source_id_value": source_id_value,
-            "title": title,
-            "authors": authors,
-            "year": year,
-            "venue": venue,
-            "url": work.get("id", ""),
-            "abstract": abstract,
-        })
+        normalized.append(
+            {
+                "source_id_type": source_id_type,
+                "source_id_value": source_id_value,
+                "title": title,
+                "authors": authors,
+                "year": year,
+                "venue": venue,
+                "url": work.get("id", ""),
+                "abstract": abstract,
+            }
+        )
 
     return normalized
 

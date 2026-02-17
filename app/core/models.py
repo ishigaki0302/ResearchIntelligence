@@ -12,7 +12,6 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
-    event,
 )
 from sqlalchemy.orm import DeclarativeBase, relationship
 
@@ -267,5 +266,8 @@ class Job(Base):
     status = Column(String(32), nullable=False, default="pending")  # pending/running/done/failed
     payload_json = Column(Text)
     error = Column(Text)
+    summary_json = Column(Text)  # JSON: counts, duration, etc.
+    started_at = Column(DateTime)
+    finished_at = Column(DateTime)
     created_at = Column(DateTime, default=_utcnow)
     updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)

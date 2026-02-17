@@ -12,7 +12,7 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from app.connectors.acl import fetch_acl_papers
-from app.core.bibtex import parse_bibtex_file, parse_author_string
+from app.core.bibtex import parse_author_string, parse_bibtex_file
 from app.core.db import get_session, init_db
 from app.core.service import (
     add_item_to_collection,
@@ -210,7 +210,8 @@ def import_acl(
     vol_str = ",".join(volumes) if volumes else "all"
     coll_name = f"{event.upper()} {year} ({vol_str})"
     collection = get_or_create_collection(
-        session, coll_name,
+        session,
+        coll_name,
         spec={"event": event, "year": year, "volumes": volumes},
     )
 

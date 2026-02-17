@@ -1,14 +1,9 @@
 """Tests for trend analytics."""
 
-import json
-from pathlib import Path
-
-import pytest
-
 from app.analytics.trends import (
-    items_by_year_venue,
     items_by_year_collection,
     items_by_year_tag,
+    items_by_year_venue,
     top_keyphrases_by_year,
 )
 from app.core.service import (

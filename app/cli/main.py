@@ -30,6 +30,15 @@ app.add_typer(inbox_app)
 analytics_app = typer.Typer(name="analytics", help="Trend analytics")
 app.add_typer(analytics_app)
 
+sync_app = typer.Typer(name="sync", help="Auto-sync pipeline")
+app.add_typer(sync_app)
+
+digest_app = typer.Typer(name="digest", help="Generate digest reports")
+app.add_typer(digest_app)
+
+backup_app = typer.Typer(name="backup", help="Backup and restore")
+app.add_typer(backup_app)
+
 
 @tag_app.command("add")
 def tag_add(
@@ -776,6 +785,238 @@ def analytics_export(
         }
         Path(out).write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
         typer.echo(f"Exported analytics to {out}")
+    finally:
+        session.close()
+
+
+@backup_app.command("create")
+def backup_create(
+    out: str = typer.Option("backup.zip", "--out", "-o", help="Output zip file path"),
+    no_pdf: bool = typer.Option(False, "--no-pdf", help="Exclude PDF files"),
+    no_cache: bool = typer.Option(False, "--no-cache", help="Exclude cache files"),
+):
+    """Create a backup of the database and data files."""
+    from app.pipelines.backup import create_backup
+
+    result = create_backup(output_path=out, no_pdf=no_pdf, no_cache=no_cache)
+    size_mb = result["size_bytes"] / (1024 * 1024)
+    typer.echo(f"Backup created: {result['path']} ({result['files']} files, {size_mb:.1f} MB)")
+
+
+@backup_app.command("restore")
+def backup_restore(
+    from_path: str = typer.Argument(..., help="Path to backup.zip"),
+):
+    """Show restore instructions for a backup file."""
+    import zipfile
+
+    p = Path(from_path)
+    if not p.exists():
+        typer.echo(f"File not found: {from_path}", err=True)
+        raise typer.Exit(1)
+
+    with zipfile.ZipFile(p, "r") as zf:
+        names = zf.namelist()
+        typer.echo(f"Backup contains {len(names)} files:")
+        for n in names[:20]:
+            typer.echo(f"  {n}")
+        if len(names) > 20:
+            typer.echo(f"  ... and {len(names) - 20} more")
+
+    typer.echo("\nTo restore, extract the backup into the repo root:")
+    typer.echo(f"  unzip -o {from_path} -d <repo_root>")
+    typer.echo("  ri migrate  # apply any pending migrations")
+
+
+@app.command()
+def migrate():
+    """Run database migrations to latest version."""
+    from app.core.db import SCHEMA_VERSION, get_engine, get_schema_version, init_db, run_migrations
+
+    engine = get_engine()
+    from app.core.models import Base
+
+    Base.metadata.create_all(engine)
+    applied = run_migrations(engine)
+    current = get_schema_version(engine)
+    # Also ensure FTS tables exist
+    init_db()
+    if applied:
+        typer.echo(f"Applied {len(applied)} migration(s): {applied}")
+    typer.echo(f"Schema version: {current} (latest: {SCHEMA_VERSION})")
+
+
+@sync_app.command("run")
+def sync_run(
+    since: str = typer.Option("7d", "--since", help="Look back period (e.g. 7d, 14d)"),
+    watch_name: Optional[str] = typer.Option(None, "--watch", help="Run specific watch"),
+    limit: int = typer.Option(100, "--limit", help="Max results per watch"),
+    recommend: bool = typer.Option(True, "--recommend/--no-recommend", help="Run inbox recommend after"),
+    out: Optional[str] = typer.Option(None, "--out", help="Output digest file path"),
+):
+    """Run sync pipeline: watch run + inbox recommend + digest."""
+    from app.pipelines.sync import run_sync
+
+    result = run_sync(
+        since=since,
+        watch_name=watch_name,
+        limit=limit,
+        run_recommend=recommend,
+        output_path=out,
+    )
+    typer.echo(
+        f"Sync complete: {result['watches_run']} watches, "
+        f"{result['total_added']} new items, {result['recommended']} recommended"
+    )
+    if result.get("digest_path"):
+        typer.echo(f"Digest saved: {result['digest_path']}")
+
+
+@sync_app.command("status")
+def sync_status():
+    """Show recent sync job status."""
+    import json
+
+    from sqlalchemy import select
+
+    from app.core.db import get_session, init_db
+    from app.core.models import Job
+
+    init_db()
+    session = get_session()
+    try:
+        jobs = (
+            session.execute(select(Job).where(Job.job_type == "sync").order_by(Job.created_at.desc()).limit(5))
+            .scalars()
+            .all()
+        )
+        if not jobs:
+            typer.echo("No sync jobs found.")
+            return
+        for j in jobs:
+            summary = json.loads(j.summary_json) if j.summary_json else {}
+            typer.echo(
+                f"[{j.id}] {j.status} at {j.created_at} — "
+                f"{summary.get('watches_run', '?')} watches, "
+                f"{summary.get('total_added', '?')} added"
+            )
+            if summary.get("digest_path"):
+                typer.echo(f"     Digest: {summary['digest_path']}")
+    finally:
+        session.close()
+
+
+@sync_app.command("digest")
+def sync_digest():
+    """Show the latest sync digest."""
+    from app.core.config import get_config, resolve_path
+
+    cfg = get_config()
+    sync_cfg = cfg.get("sync", {})
+    output_dir = resolve_path(sync_cfg.get("output_dir", "data/cache/sync"))
+    if not output_dir.exists():
+        typer.echo("No sync output directory found.")
+        return
+    # Find latest digest.md
+    md_files = sorted(output_dir.glob("digest_*.md"), reverse=True)
+    if not md_files:
+        typer.echo("No digest files found.")
+        return
+    typer.echo(md_files[0].read_text(encoding="utf-8"))
+
+
+@digest_app.command("weekly")
+def digest_weekly(
+    since: str = typer.Option("7d", "--since", help="Look back period (e.g. 7d, 14d)"),
+    out: Optional[str] = typer.Option(None, "--out", help="Output markdown file path"),
+):
+    """Generate a weekly digest report."""
+    from app.analytics.digest import generate_digest
+    from app.core.db import get_session, init_db
+
+    init_db()
+    session = get_session()
+    try:
+        result = generate_digest(session, since=since, output_path=out)
+        if result.get("output_path"):
+            typer.echo(f"Digest written to {result['output_path']}")
+        else:
+            typer.echo(result["markdown"])
+    finally:
+        session.close()
+
+
+@digest_app.command("watch")
+def digest_watch(
+    name: str = typer.Option(..., "--name", help="Watch name"),
+    since: str = typer.Option("14d", "--since", help="Look back period"),
+):
+    """Generate a digest for a specific watch."""
+    from app.analytics.digest import generate_digest
+    from app.core.db import get_session, init_db
+
+    init_db()
+    session = get_session()
+    try:
+        result = generate_digest(session, since=since, watch_name=name)
+        typer.echo(result["markdown"])
+    finally:
+        session.close()
+
+
+@analytics_app.command("cluster")
+def analytics_cluster(
+    n_clusters: int = typer.Option(5, "--clusters", "-n", help="Number of clusters"),
+    out: Optional[str] = typer.Option(None, "--out", help="Output JSON file path"),
+):
+    """Run topic clustering on items."""
+    import json
+
+    from app.analytics.clustering import cluster_items
+    from app.core.db import get_session, init_db
+
+    init_db()
+    session = get_session()
+    try:
+        result = cluster_items(session, n_clusters=n_clusters)
+        if out:
+            Path(out).write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
+            typer.echo(f"Cluster results written to {out}")
+        else:
+            for c in result["clusters"]:
+                typer.echo(f"\nCluster {c['id']} ({c['size']} items): {', '.join(c['top_terms'][:5])}")
+                for item in c["representative_items"][:3]:
+                    typer.echo(f"  - {item['title'][:80]}")
+    finally:
+        session.close()
+
+
+@analytics_app.command("graph-stats")
+def analytics_graph_stats(
+    out: Optional[str] = typer.Option(None, "--out", help="Output JSON file path"),
+):
+    """Analyze the citation network."""
+    import json
+
+    from app.analytics.network import analyze_citation_network
+    from app.core.db import get_session, init_db
+
+    init_db()
+    session = get_session()
+    try:
+        result = analyze_citation_network(session)
+        if out:
+            Path(out).write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
+            typer.echo(f"Graph stats written to {out}")
+        else:
+            typer.echo(f"Nodes: {result['node_count']}, Edges: {result['edge_count']}")
+            typer.echo("\nTop cited (in-degree):")
+            for item in result["top_in_degree"][:5]:
+                typer.echo(f"  [{item['in_degree']}] {item['title'][:70]}")
+            typer.echo("\nTop PageRank:")
+            for item in result["top_pagerank"][:5]:
+                typer.echo(f"  [{item['pagerank']:.4f}] {item['title'][:70]}")
+            typer.echo(f"\nCommunities: {result['community_count']}")
     finally:
         session.close()
 

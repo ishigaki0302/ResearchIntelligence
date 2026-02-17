@@ -1,18 +1,14 @@
 """Tests for import idempotency and core functionality."""
 
 import textwrap
-from pathlib import Path
 
-import pytest
-
-from app.core.service import upsert_item, find_item_by_external_id
 from app.core.bibtex import (
     generate_bibtex_key,
     normalize_name,
     parse_author_string,
     parse_bibtex_string,
 )
-from app.core.models import Item
+from app.core.service import upsert_item
 
 
 class TestBibtexParsing:
@@ -34,9 +30,7 @@ class TestBibtexParsing:
 
     def test_generate_bibtex_key_collision(self):
         existing = {"smith2024long"}
-        key = generate_bibtex_key(
-            ["John Smith"], 2024, "Long Context Transformers", existing
-        )
+        key = generate_bibtex_key(["John Smith"], 2024, "Long Context Transformers", existing)
         assert key == "smith2024longa"
 
     def test_generate_bibtex_key_no_authors(self):
@@ -78,14 +72,20 @@ class TestImportIdempotency:
     def test_upsert_idempotent_by_bibtex_key(self, tmp_db):
         session = tmp_db
         item1, c1 = upsert_item(
-            session, title="Test Paper", authors=["Alice Smith"],
-            year=2024, bibtex_key="smith2024test",
+            session,
+            title="Test Paper",
+            authors=["Alice Smith"],
+            year=2024,
+            bibtex_key="smith2024test",
         )
         session.commit()
 
         item2, c2 = upsert_item(
-            session, title="Test Paper", authors=["Alice Smith"],
-            year=2024, bibtex_key="smith2024test",
+            session,
+            title="Test Paper",
+            authors=["Alice Smith"],
+            year=2024,
+            bibtex_key="smith2024test",
         )
         session.commit()
 
@@ -96,14 +96,20 @@ class TestImportIdempotency:
     def test_upsert_idempotent_by_external_id(self, tmp_db):
         session = tmp_db
         item1, c1 = upsert_item(
-            session, title="Paper A", authors=["Bob"],
-            year=2024, external_ids={"acl": "2024.acl-long.1"},
+            session,
+            title="Paper A",
+            authors=["Bob"],
+            year=2024,
+            external_ids={"acl": "2024.acl-long.1"},
         )
         session.commit()
 
         item2, c2 = upsert_item(
-            session, title="Paper A", authors=["Bob"],
-            year=2024, external_ids={"acl": "2024.acl-long.1"},
+            session,
+            title="Paper A",
+            authors=["Bob"],
+            year=2024,
+            external_ids={"acl": "2024.acl-long.1"},
         )
         session.commit()
 
@@ -114,12 +120,16 @@ class TestImportIdempotency:
     def test_upsert_idempotent_by_title_year(self, tmp_db):
         session = tmp_db
         item1, c1 = upsert_item(
-            session, title="Exact Same Title", year=2024,
+            session,
+            title="Exact Same Title",
+            year=2024,
         )
         session.commit()
 
         item2, c2 = upsert_item(
-            session, title="Exact Same Title", year=2024,
+            session,
+            title="Exact Same Title",
+            year=2024,
         )
         session.commit()
 
@@ -130,14 +140,18 @@ class TestImportIdempotency:
     def test_upsert_updates_missing_fields(self, tmp_db):
         session = tmp_db
         item1, _ = upsert_item(
-            session, title="Paper X", year=2024,
+            session,
+            title="Paper X",
+            year=2024,
             bibtex_key="x2024paper",
         )
         session.commit()
         assert item1.abstract is None
 
         item2, created = upsert_item(
-            session, title="Paper X", year=2024,
+            session,
+            title="Paper X",
+            year=2024,
             bibtex_key="x2024paper",
             abstract="This is the abstract.",
         )
@@ -149,7 +163,9 @@ class TestImportIdempotency:
     def test_note_created_on_upsert(self, tmp_db):
         session = tmp_db
         item, _ = upsert_item(
-            session, title="Paper With Note", year=2024,
+            session,
+            title="Paper With Note",
+            year=2024,
         )
         session.commit()
 

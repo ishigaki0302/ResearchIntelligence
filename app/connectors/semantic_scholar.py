@@ -7,7 +7,7 @@ from pathlib import Path
 
 import requests
 
-from app.core.config import resolve_path, get_config
+from app.core.config import get_config, resolve_path
 
 logger = logging.getLogger(__name__)
 

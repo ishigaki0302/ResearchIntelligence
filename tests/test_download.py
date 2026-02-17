@@ -94,9 +94,7 @@ def test_download_failure_recorded(mock_get, tmp_db):
     assert result["failed"] == 1
     assert result["downloaded"] == 0
 
-    jobs = tmp_db.execute(
-        select(Job).where(Job.job_type == "download_pdf", Job.status == "failed")
-    ).scalars().all()
+    jobs = tmp_db.execute(select(Job).where(Job.job_type == "download_pdf", Job.status == "failed")).scalars().all()
     assert len(jobs) == 1
     payload = json.loads(jobs[0].payload_json)
     assert payload["item_id"] == item.id

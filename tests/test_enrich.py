@@ -1,12 +1,11 @@
 """Tests for enrichment pipeline."""
 
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 from sqlalchemy import select
 
 from app.core.models import Item, ItemId
-from app.pipelines.enricher import enrich_item, _get_item_ext_ids
-
+from app.pipelines.enricher import enrich_item
 
 S2_RESPONSE = {
     "paperId": "abc123",
@@ -40,6 +39,7 @@ OPENALEX_RESPONSE = [
 def _enable_external(test_config):
     """Enable external APIs in test config."""
     import app.core.config as config_mod
+
     test_config.setdefault("external", {})
     test_config["external"]["semantic_scholar"] = {"enabled": True, "api_key": ""}
     test_config["external"]["openalex"] = {"enabled": True, "email": ""}
@@ -50,6 +50,7 @@ def _enable_external(test_config):
 def test_enrich_by_doi(tmp_db):
     """Item with DOI should get S2 ID via Semantic Scholar lookup."""
     import app.core.config as config_mod
+
     _enable_external(config_mod.get_config._cache)
 
     item = Item(title="Attention Is All You Need", year=2017)
@@ -68,6 +69,7 @@ def test_enrich_by_doi(tmp_db):
 def test_enrich_by_title(tmp_db):
     """Item without DOI should fall back to OpenAlex title search."""
     import app.core.config as config_mod
+
     cfg = config_mod.get_config._cache
     _enable_external(cfg)
     # Disable S2 to force OpenAlex fallback
@@ -87,6 +89,7 @@ def test_enrich_by_title(tmp_db):
 def test_enrich_no_match(tmp_db):
     """Low-scoring match should not add any IDs."""
     import app.core.config as config_mod
+
     cfg = config_mod.get_config._cache
     _enable_external(cfg)
     cfg["external"]["semantic_scholar"]["enabled"] = False
@@ -106,6 +109,7 @@ def test_enrich_no_match(tmp_db):
 def test_enrich_idempotent(tmp_db):
     """Enriching twice should not create duplicate IDs."""
     import app.core.config as config_mod
+
     _enable_external(config_mod.get_config._cache)
 
     item = Item(title="Attention Is All You Need", year=2017)
@@ -122,8 +126,6 @@ def test_enrich_idempotent(tmp_db):
     assert len(result2["ids_added"]) == 0  # no new IDs second time
 
     # Verify no duplicates
-    all_ids = tmp_db.execute(
-        select(ItemId).where(ItemId.item_id == item.id)
-    ).scalars().all()
+    all_ids = tmp_db.execute(select(ItemId).where(ItemId.item_id == item.id)).scalars().all()
     type_values = [(i.id_type, i.id_value) for i in all_ids]
     assert len(type_values) == len(set(type_values))

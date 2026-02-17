@@ -3,8 +3,8 @@
 import hashlib
 import json
 import logging
-import unicodedata
 import re
+import unicodedata
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -23,7 +23,13 @@ def _normalize_for_dedup(text: str) -> str:
     return text
 
 
-def _compute_dedup_hash(source_id_type: str | None, source_id_value: str | None, title: str | None = None, year: int | None = None, first_author: str | None = None) -> str:
+def _compute_dedup_hash(
+    source_id_type: str | None,
+    source_id_value: str | None,
+    title: str | None = None,
+    year: int | None = None,
+    first_author: str | None = None,
+) -> str:
     """Compute a dedup hash for an inbox candidate."""
     if source_id_type and source_id_value:
         raw = f"{source_id_type}:{source_id_value}"
@@ -36,18 +42,19 @@ def _compute_dedup_hash(source_id_type: str | None, source_id_value: str | None,
 
 def _already_in_inbox(session: Session, dedup_hash: str) -> bool:
     """Check if a paper with this hash is already in the inbox."""
-    return session.execute(
-        select(InboxItem).where(InboxItem.dedup_hash == dedup_hash)
-    ).scalar_one_or_none() is not None
+    return session.execute(select(InboxItem).where(InboxItem.dedup_hash == dedup_hash)).scalar_one_or_none() is not None
 
 
 def _already_in_items(session: Session, source_id_type: str | None, source_id_value: str | None) -> bool:
     """Check if this paper is already in the main items table."""
     if not source_id_type or not source_id_value:
         return False
-    return session.execute(
-        select(ItemId).where(ItemId.id_type == source_id_type, ItemId.id_value == source_id_value)
-    ).scalar_one_or_none() is not None
+    return (
+        session.execute(
+            select(ItemId).where(ItemId.id_type == source_id_type, ItemId.id_value == source_id_value)
+        ).scalar_one_or_none()
+        is not None
+    )
 
 
 def run_watch(session: Session, watch: Watch, since_days: int = 14, limit: int = 100) -> dict:
