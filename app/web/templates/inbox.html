@@ -39,13 +39,9 @@
     </p>
     {% if it.recommended and it.reasons_json %}
     <div style="font-size:0.85em; color:#28a745; margin-bottom:0.3rem;">
-        {% for reason in it.reasons_json | tojson | default('[]') %}{% endfor %}
-        {% set reasons = [] %}
-        {% if it.reasons_json %}
-            {% for r in it.reasons_json|replace('[','') |replace(']','')|replace('"','')|split(',') %}
-                {% if r.strip() %}<span class="badge" style="background:#e8f5e9; color:#2e7d32; font-size:0.8em;">{{ r.strip() }}</span> {% endif %}
-            {% endfor %}
-        {% endif %}
+        {% for r in it.reasons_json | fromjson %}
+            <span class="badge" style="background:#e8f5e9; color:#2e7d32; font-size:0.8em;">{{ r }}</span>
+        {% endfor %}
     </div>
     {% endif %}
     {% if it.abstract %}
@@ -65,8 +61,8 @@
         {% if it.auto_tags_json and it.auto_tags_json != '[]' %}
         <span style="font-size:0.8em; color:#666;">
             自動タグ:
-            {% for tag in it.auto_tags_json|replace('[','') |replace(']','')|replace('"','')|split(',') %}
-                {% if tag.strip() %}<code>{{ tag.strip() }}</code> {% endif %}
+            {% for tag in it.auto_tags_json | fromjson %}
+                <code>{{ tag }}</code>
             {% endfor %}
         </span>
         {% endif %}

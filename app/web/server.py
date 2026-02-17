@@ -23,6 +23,19 @@ STATIC_DIR = Path(__file__).parent / "static"
 app = FastAPI(title="Research Intelligence")
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
+
+def _fromjson(value: str) -> list | dict:
+    """Jinja2 filter: parse a JSON string."""
+    if not value:
+        return []
+    try:
+        return json.loads(value)
+    except (json.JSONDecodeError, TypeError):
+        return []
+
+
+templates.env.filters["fromjson"] = _fromjson
+
 if STATIC_DIR.exists():
     app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
