@@ -39,16 +39,57 @@ VENUE_PREFIXES = {
     "emnlp": {
         "main": ["emnlp-main"],
         "findings": ["findings-emnlp"],
+        "demo": ["emnlp-demo"],
+        "srw": ["emnlp-srw"],
     },
     "naacl": {
         "main": ["naacl-long", "naacl-short"],
         "findings": ["findings-naacl"],
+        "demo": ["naacl-demo"],
+        "srw": ["naacl-srw"],
     },
     "eacl": {
         "main": ["eacl-long", "eacl-short"],
         "findings": ["findings-eacl"],
+        "demo": ["eacl-demo"],
+        "srw": ["eacl-srw"],
+    },
+    "coling": {
+        "main": ["coling-main"],
     },
 }
+
+# Year-dependent venue prefixes (prefix changed over time)
+def _get_venue_prefixes(event: str, year: int) -> dict[str, list[str]]:
+    """Get volume prefix map for a venue, considering year-dependent changes."""
+    event_lower = event.lower()
+
+    # IJCNLP / AACL-IJCNLP: prefix changed from aacl-* (2020-2022) to ijcnlp-* (2023+)
+    # Also "main" became "long" in 2025+
+    if event_lower in ("ijcnlp", "aacl", "aacl-ijcnlp"):
+        if year <= 2022:
+            return {
+                "main": ["aacl-main", "aacl-short"],
+                "findings": ["findings-aacl"],
+                "demo": ["aacl-demo"],
+                "srw": ["aacl-srw"],
+            }
+        elif year <= 2024:
+            return {
+                "main": ["ijcnlp-main", "ijcnlp-short"],
+                "findings": ["findings-ijcnlp"],
+                "demo": ["ijcnlp-demo"],
+                "srw": ["ijcnlp-srw"],
+            }
+        else:  # 2025+
+            return {
+                "main": ["ijcnlp-long", "ijcnlp-short"],
+                "findings": ["findings-ijcnlp"],
+                "demo": ["ijcnlp-demo"],
+                "srw": ["ijcnlp-srw"],
+            }
+
+    return VENUE_PREFIXES.get(event_lower, VOLUME_MAP)
 
 ACL_ANTHOLOGY_BASE = "https://aclanthology.org"
 
@@ -62,8 +103,7 @@ def _cache_dir() -> Path:
 
 def _volume_ids(event: str, year: int, volumes: list[str] | None = None) -> list[str]:
     """Build ACL Anthology volume IDs for the given event/year/volumes."""
-    event_lower = event.lower()
-    vol_map = VENUE_PREFIXES.get(event_lower, VOLUME_MAP)
+    vol_map = _get_venue_prefixes(event, year)
 
     if volumes is None:
         volumes = list(vol_map.keys())
@@ -194,7 +234,7 @@ def fetch_acl_papers(
     for vol_id in vol_ids:
         # Determine volume type for tagging
         vol_type = "unknown"
-        for vt, prefixes in VENUE_PREFIXES.get(event.lower(), VOLUME_MAP).items():
+        for vt, prefixes in _get_venue_prefixes(event, year).items():
             for p in prefixes:
                 if vol_id.endswith(p):
                     vol_type = vt
