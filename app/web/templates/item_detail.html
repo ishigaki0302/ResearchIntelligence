@@ -15,12 +15,14 @@
     &middot; <strong>BibTeX Key:</strong> <code>{{ item.bibtex_key or '—' }}</code>
 </div>
 
-{% if item.source_url %}
+{% if item.source_url or item.pdf_path %}
 <div style="margin-bottom: 1rem;">
+    {% if item.source_url %}
     <a href="{{ item.source_url }}" target="_blank" class="btn btn-secondary">原文リンク</a>
+    {% endif %}
     {% if item.pdf_path %}
-    <span class="badge" style="margin-left: 0.5rem;">PDF あり</span>
-    {% else %}
+    <a href="/item/{{ item.id }}/pdf" target="_blank" class="btn btn-secondary" style="margin-left: 0.5rem;">PDF を開く</a>
+    {% elif item.source_url %}
     <button id="btn-download-extract" onclick="downloadAndExtract()" class="btn btn-secondary" style="margin-left: 0.5rem;">PDF取得＆引用抽出</button>
     <span id="download-status" style="margin-left: 0.5rem;"></span>
     {% endif %}

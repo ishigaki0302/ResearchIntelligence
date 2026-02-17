@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Optional
 
 from fastapi import FastAPI, Form, Query, Request
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import func, select
@@ -162,6 +162,26 @@ def item_detail(request: Request, item_id: int):
                 "tags": tags,
                 "graph": graph,
             },
+        )
+    finally:
+        session.close()
+
+
+@app.get("/item/{item_id}/pdf")
+def item_pdf(item_id: int):
+    """Serve the PDF file for an item."""
+    session = get_session()
+    try:
+        item = session.get(Item, item_id)
+        if not item or not item.pdf_path:
+            return HTMLResponse("PDF not found", status_code=404)
+        pdf_file = resolve_path(item.pdf_path)
+        if not pdf_file.exists():
+            return HTMLResponse("PDF file missing", status_code=404)
+        return FileResponse(
+            pdf_file,
+            media_type="application/pdf",
+            filename=f"{item.bibtex_key or item_id}.pdf",
         )
     finally:
         session.close()
