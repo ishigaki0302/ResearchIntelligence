@@ -267,6 +267,16 @@ class InboxItem(Base):
     __table_args__ = (UniqueConstraint("source_id_type", "source_id_value", name="uq_inbox_source_id"),)
 
 
+class ViewHistory(Base):
+    __tablename__ = "view_history"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    item_id = Column(Integer, ForeignKey("items.id", ondelete="CASCADE"), nullable=False)
+    viewed_at = Column(DateTime, default=_utcnow)
+
+    item = relationship("Item")
+
+
 class Job(Base):
     __tablename__ = "jobs"
 

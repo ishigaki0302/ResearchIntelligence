@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}閲覧履歴 — Research Intelligence{% endblock %}
+{% block content %}
+<h1>閲覧履歴</h1>
+{% if history %}
+<table style="width:100%; border-collapse:collapse;">
+  <thead>
+    <tr style="border-bottom:2px solid var(--border); text-align:left;">
+      <th style="padding:0.5rem;">タイトル</th>
+      <th style="padding:0.5rem;">著者</th>
+      <th style="padding:0.5rem;">Venue</th>
+      <th style="padding:0.5rem;">閲覧日時</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for h in history %}
+    <tr style="border-bottom:1px solid var(--border);">
+      <td style="padding:0.5rem;"><a href="/item/{{ h.item.id }}">{{ h.item.title }}</a></td>
+      <td style="padding:0.5rem; font-size:0.85rem; color:var(--muted);">{{ h.item.author_names | join(', ') }}</td>
+      <td style="padding:0.5rem; font-size:0.85rem;">{{ h.item.venue or '' }}</td>
+      <td style="padding:0.5rem; font-size:0.85rem; color:var(--muted); white-space:nowrap;">{{ h.viewed_at.strftime('%Y-%m-%d %H:%M') if h.viewed_at else '' }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p style="color:var(--muted);">閲覧履歴はまだありません。</p>
+{% endif %}
+{% endblock %}

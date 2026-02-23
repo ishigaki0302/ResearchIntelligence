@@ -12,7 +12,7 @@ from sqlalchemy import func, select
 
 from app.core.config import resolve_path
 from app.core.db import get_session, init_db
-from app.core.models import Citation, Collection, InboxItem, Item, ItemId, Job, Note, Tag, Watch
+from app.core.models import Citation, Collection, InboxItem, Item, ItemId, Job, Note, Tag, ViewHistory, Watch
 from app.core.service import add_tag_to_item, list_tags_for_item, remove_tag_from_item
 from app.graph.citations import get_citation_subgraph
 from app.indexing.engine import hybrid_search
@@ -175,6 +175,10 @@ def item_detail(request: Request, item_id: int):
         item = session.get(Item, item_id)
         if not item:
             return HTMLResponse("Item not found", status_code=404)
+
+        # Record view history
+        session.add(ViewHistory(item_id=item_id))
+        session.commit()
 
         # Get notes
         notes = session.execute(select(Note).where(Note.item_id == item_id)).scalars().all()
@@ -697,6 +701,40 @@ def jobs_page(request: Request):
             {
                 "request": request,
                 "jobs": jobs,
+            },
+        )
+    finally:
+        session.close()
+
+
+@app.get("/history", response_class=HTMLResponse)
+def history_page(request: Request):
+    session = get_session()
+    try:
+        # Get latest view per item, ordered by most recent, limit 50
+        latest_per_item = (
+            select(
+                ViewHistory.item_id,
+                func.max(ViewHistory.viewed_at).label("last_viewed"),
+            )
+            .group_by(ViewHistory.item_id)
+            .subquery()
+        )
+        rows = (
+            session.execute(
+                select(Item, latest_per_item.c.last_viewed)
+                .join(latest_per_item, Item.id == latest_per_item.c.item_id)
+                .order_by(latest_per_item.c.last_viewed.desc())
+                .limit(50)
+            )
+            .all()
+        )
+        history = [{"item": item, "viewed_at": viewed_at} for item, viewed_at in rows]
+        return templates.TemplateResponse(
+            "history.html",
+            {
+                "request": request,
+                "history": history,
             },
         )
     finally:

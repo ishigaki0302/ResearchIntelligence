@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 _engine = None
 _SessionLocal = None
 
-SCHEMA_VERSION = 4  # Current schema version
+SCHEMA_VERSION = 5  # Current schema version
 
 
 def get_engine(db_path: Path | None = None):
@@ -166,11 +166,26 @@ def _migration_v4(engine):
         conn.commit()
 
 
+def _migration_v5(engine):
+    """v0.8: create view_history table."""
+    with engine.connect() as conn:
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS view_history (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                item_id INTEGER NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+                viewed_at DATETIME DEFAULT (datetime('now'))
+            )
+        """))
+        conn.commit()
+    logger.info("Migration v5: created view_history table")
+
+
 MIGRATIONS = {
     1: ("v0.4 column additions", _migration_v1),
     2: ("v0.5 job summary + timestamps", _migration_v2),
     3: ("v0.6 auto-accept + dedup columns", _migration_v3),
     4: ("v0.7 version management columns", _migration_v4),
+    5: ("v0.8 view history table", _migration_v5),
 }
 
 
