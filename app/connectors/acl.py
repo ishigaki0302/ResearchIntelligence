@@ -59,6 +59,7 @@ VENUE_PREFIXES = {
     },
 }
 
+
 # Year-dependent venue prefixes (prefix changed over time)
 def _get_venue_prefixes(event: str, year: int) -> dict[str, list[str]]:
     """Get volume prefix map for a venue, considering year-dependent changes."""
@@ -90,6 +91,7 @@ def _get_venue_prefixes(event: str, year: int) -> dict[str, list[str]]:
             }
 
     return VENUE_PREFIXES.get(event_lower, VOLUME_MAP)
+
 
 ACL_ANTHOLOGY_BASE = "https://aclanthology.org"
 

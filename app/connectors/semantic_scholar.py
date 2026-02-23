@@ -50,6 +50,7 @@ def _cached_get(url: str, params: dict | None = None) -> dict | None:
         if resp.status_code == 429:
             logger.warning("Semantic Scholar rate limit hit, waiting 3s...")
             import time
+
             time.sleep(3)
             resp = requests.get(url, params=params, headers=_get_headers(), timeout=30)
         resp.raise_for_status()

@@ -136,15 +136,11 @@ def build_citations_from_metadata(
             dst_key = ref_ext.get("DOI") or ref_ext.get("ArXiv") or None
 
             if matched_item_id:
-                cite_hash = hashlib.sha256(
-                    f"metadata:{item.id}:{matched_item_id}".encode("utf-8")
-                ).hexdigest()
+                cite_hash = hashlib.sha256(f"metadata:{item.id}:{matched_item_id}".encode("utf-8")).hexdigest()
             else:
                 # Unmatched: use paperId for dedup
                 ref_pid = ref.get("paperId", raw_text)
-                cite_hash = hashlib.sha256(
-                    f"metadata:{item.id}:ext:{ref_pid}".encode("utf-8")
-                ).hexdigest()
+                cite_hash = hashlib.sha256(f"metadata:{item.id}:ext:{ref_pid}".encode("utf-8")).hexdigest()
 
             if cite_hash in existing_hashes:
                 continue
@@ -152,11 +148,14 @@ def build_citations_from_metadata(
             # Store S2 external IDs in context for later import
             context_data = None
             if not matched_item_id:
-                context_data = json.dumps({
-                    "s2_paper_id": ref.get("paperId"),
-                    "external_ids": ref_ext,
-                    "title": ref_title,
-                }, ensure_ascii=False)
+                context_data = json.dumps(
+                    {
+                        "s2_paper_id": ref.get("paperId"),
+                        "external_ids": ref_ext,
+                        "title": ref_title,
+                    },
+                    ensure_ascii=False,
+                )
 
             cit = Citation(
                 src_item_id=item.id,

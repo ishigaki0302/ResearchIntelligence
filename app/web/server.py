@@ -130,10 +130,7 @@ def search_page(
                 query_stmt = query_stmt.join(ItemTag).join(Tag).where(Tag.name == filters["tag"])
             if filters.get("author"):
                 author_q = filters["author"].lower()
-                query_stmt = (
-                    query_stmt.join(ItemAuthor).join(Author)
-                    .where(Author.norm_name.contains(author_q))
-                )
+                query_stmt = query_stmt.join(ItemAuthor).join(Author).where(Author.norm_name.contains(author_q))
             query_stmt = query_stmt.order_by(Item.year.desc().nulls_last(), Item.id.desc()).limit(500)
             items_found = session.execute(query_stmt).scalars().all()
             all_results = [{"item": it, "score": 0, "snippet": "", "matched_chunks": []} for it in items_found]
@@ -617,9 +614,7 @@ def resolve_citation_api(citation_id: int, target_item_id: int = Form(...)):
             return JSONResponse({"error": "Target item not found"}, status_code=404)
         citation.dst_item_id = target_item_id
         session.commit()
-        return JSONResponse(
-            {"ok": True, "citation_id": citation_id, "dst_item_id": target_item_id}
-        )
+        return JSONResponse({"ok": True, "citation_id": citation_id, "dst_item_id": target_item_id})
     finally:
         session.close()
 
@@ -720,15 +715,12 @@ def history_page(request: Request):
             .group_by(ViewHistory.item_id)
             .subquery()
         )
-        rows = (
-            session.execute(
-                select(Item, latest_per_item.c.last_viewed)
-                .join(latest_per_item, Item.id == latest_per_item.c.item_id)
-                .order_by(latest_per_item.c.last_viewed.desc())
-                .limit(50)
-            )
-            .all()
-        )
+        rows = session.execute(
+            select(Item, latest_per_item.c.last_viewed)
+            .join(latest_per_item, Item.id == latest_per_item.c.item_id)
+            .order_by(latest_per_item.c.last_viewed.desc())
+            .limit(50)
+        ).all()
         history = [{"item": item, "viewed_at": viewed_at} for item, viewed_at in rows]
         return templates.TemplateResponse(
             "history.html",

@@ -498,9 +498,7 @@ def hybrid_search(
                 from app.core.models import ItemTag, Tag
 
                 tag_match = session.execute(
-                    select(ItemTag)
-                    .join(Tag)
-                    .where(ItemTag.item_id == item.id, Tag.name == filters["tag"])
+                    select(ItemTag).join(Tag).where(ItemTag.item_id == item.id, Tag.name == filters["tag"])
                 ).first()
                 if not tag_match:
                     continue

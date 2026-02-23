@@ -1221,11 +1221,7 @@ def version_link(
         old_groups = {g for g in [item1.version_group_id, item2.version_group_id] if g}
         items_to_update = [item1, item2]
         if old_groups:
-            others = (
-                session.execute(select(Item).where(Item.version_group_id.in_(old_groups)))
-                .scalars()
-                .all()
-            )
+            others = session.execute(select(Item).where(Item.version_group_id.in_(old_groups))).scalars().all()
             items_to_update.extend(others)
 
         seen = set()
