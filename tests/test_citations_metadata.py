@@ -56,7 +56,7 @@ def test_build_citations_dedup(tmp_db):
     session = tmp_db
 
     src = _make_item(session, "Source", ext_ids={"doi": "10.1234/src2"})
-    dst = _make_item(session, "Target", ext_ids={"doi": "10.1234/dst2"})
+    _make_item(session, "Target", ext_ids={"doi": "10.1234/dst2"})
     session.commit()
 
     mock_refs = [

@@ -52,7 +52,6 @@ def build_citations_from_metadata(
         Stats dict with processed, citations_added, api_hits, api_misses.
     """
     import hashlib
-    import time
 
     from app.connectors.semantic_scholar import get_references
 

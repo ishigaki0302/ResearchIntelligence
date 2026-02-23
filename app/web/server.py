@@ -613,7 +613,9 @@ def resolve_citation_api(citation_id: int, target_item_id: int = Form(...)):
             return JSONResponse({"error": "Target item not found"}, status_code=404)
         citation.dst_item_id = target_item_id
         session.commit()
-        return JSONResponse({"ok": True, "citation_id": citation_id, "dst_item_id": target_item_id})
+        return JSONResponse(
+            {"ok": True, "citation_id": citation_id, "dst_item_id": target_item_id}
+        )
     finally:
         session.close()
 
@@ -627,7 +629,10 @@ def import_citation_api(citation_id: int):
         if not citation:
             return JSONResponse({"error": "Citation not found"}, status_code=404)
         if citation.dst_item_id:
-            return JSONResponse({"error": "Citation already resolved", "item_id": citation.dst_item_id}, status_code=400)
+            return JSONResponse(
+                {"error": "Citation already resolved", "item_id": citation.dst_item_id},
+                status_code=400,
+            )
 
         # Parse S2 metadata from context
         ctx = {}
