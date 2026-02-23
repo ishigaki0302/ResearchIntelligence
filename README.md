@@ -213,14 +213,30 @@ ri backup restore backup.zip
 ri migrate
 ```
 
-### 11. BibTeX エクスポート
+### 11. タグ管理
+
+```bash
+ri tag add 42 "survey"        # アイテムにタグを追加
+ri tag rm 42 "survey"         # タグを削除
+ri tag ls 42                  # アイテムのタグ一覧
+```
+
+### 12. バージョン管理（v0.7 新機能）
+
+```bash
+ri version link 42 56         # 2つのアイテムを同一論文のバージョンとしてリンク
+ri version list 42            # バージョングループの一覧
+ri version unlink 42          # バージョングループから解除
+```
+
+### 13. BibTeX エクスポート
 
 ```bash
 ri export-bib -o references.bib
 ri export-bib --venue ACL --year 2024 -o acl2024.bib
 ```
 
-### 12. Web UI
+### 14. Web UI
 
 ```bash
 ri serve
@@ -233,6 +249,7 @@ ri serve
 - **アイテム詳細**: メタデータ、要旨、BibTeX、タグ、ノートエディタ、PDF閲覧、引用抽出、バージョン一覧
 - **グラフ**: 引用サブグラフ可視化（D3.js、未解決参照の灰色ノード表示）
 - **Inbox**: 発見した論文の承認/却下/自動承認
+- **コレクション**: 論文コレクションの一覧・管理
 - **Watches**: ウォッチの管理・実行
 - **ジョブ履歴**: パイプライン実行履歴
 - **閲覧履歴**: 最近閲覧した論文の一覧（最新50件）
@@ -294,7 +311,8 @@ repo/
 ├── configs/config.yaml         # アプリ設定
 ├── data/                       # ライブラリ + キャッシュ
 ├── db/app.sqlite               # SQLite データベース
-├── tests/                      # pytest テスト（118件）
+├── tests/                      # pytest テスト（119件）
+├── CLAUDE.md                   # Claude Code プロジェクトルール
 ├── CHANGELOG.md
 ├── pyproject.toml
 └── README.md
@@ -332,7 +350,7 @@ analytics:
 ## テスト
 
 ```bash
-pytest tests/ -v          # 全テスト実行（118件）
+pytest tests/ -v          # 全テスト実行（119件）
 ruff check app/ tests/    # Lint
 black --check app/ tests/ # フォーマットチェック
 ```
