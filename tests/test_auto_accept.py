@@ -2,6 +2,9 @@
 
 import json
 
+from sqlalchemy import func
+from sqlalchemy import select as sa_select
+
 from app.core.models import InboxItem, Watch
 from app.pipelines.auto_accept import (
     QualityFlags,
@@ -20,8 +23,6 @@ def _create_watch(session):
 
 
 def _create_inbox_item(session, watch, **kwargs):
-    from sqlalchemy import func, select as sa_select
-
     count = session.execute(sa_select(func.count(InboxItem.id))).scalar() + 1
     defaults = {
         "watch_id": watch.id,
