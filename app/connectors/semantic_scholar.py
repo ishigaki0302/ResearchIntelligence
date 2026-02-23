@@ -100,8 +100,9 @@ def _fetch_references(paper_id: str) -> list[dict] | None:
     data = _cached_get(url, params)
     if not data:
         return None
+    entries = data.get("data") or []
     refs = []
-    for entry in data.get("data", []):
+    for entry in entries:
         cited = entry.get("citedPaper")
         if cited and cited.get("paperId"):
             refs.append(cited)
