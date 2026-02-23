@@ -15,6 +15,20 @@
     &middot; <strong>BibTeX Key:</strong> <code>{{ item.bibtex_key or '—' }}</code>
 </div>
 
+{% if versions %}
+<div class="card" style="margin-bottom: 1rem;">
+    <h2 style="margin-top: 0;">バージョン</h2>
+    <div style="display: flex; flex-wrap: wrap; gap: 0.4rem;">
+        <span class="badge" style="background: #007bff; color: #fff;">{{ item.version_label or 'このバージョン' }}</span>
+        {% for v in versions %}
+        <a href="/item/{{ v.id }}" class="badge" style="text-decoration: none; background: #e9ecef;">
+            {{ v.version_label or 'v?' }}{% if v.version_date %} ({{ v.version_date }}){% endif %}
+        </a>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
 {% if item.source_url or item.pdf_path %}
 <div style="margin-bottom: 1rem;">
     {% if item.source_url %}

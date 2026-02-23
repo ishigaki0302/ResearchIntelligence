@@ -47,6 +47,9 @@ class Item(Base):
     text_hash = Column(String(64))  # SHA256 of title+abstract for incremental indexing
     status = Column(String(16), nullable=False, default="active")  # active/merged
     merged_into_id = Column(Integer, ForeignKey("items.id", ondelete="SET NULL"), nullable=True)
+    version_group_id = Column(Integer, ForeignKey("items.id", ondelete="SET NULL"), nullable=True)
+    version_label = Column(String(128))  # "arXiv v1", "ACL 2024", etc.
+    version_date = Column(String(16))  # ISO date of this version
     created_at = Column(DateTime, default=_utcnow)
     updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
 

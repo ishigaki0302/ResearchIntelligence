@@ -193,6 +193,19 @@ def item_detail(request: Request, item_id: int):
         # Get citation subgraph
         graph = get_citation_subgraph(session, item_id)
 
+        # Get version siblings
+        versions = []
+        if item.version_group_id:
+            versions = (
+                session.execute(
+                    select(Item)
+                    .where(Item.version_group_id == item.version_group_id, Item.id != item_id)
+                    .order_by(Item.version_date.asc().nulls_last(), Item.id.asc())
+                )
+                .scalars()
+                .all()
+            )
+
         return templates.TemplateResponse(
             "item_detail.html",
             {
@@ -202,6 +215,7 @@ def item_detail(request: Request, item_id: int):
                 "note_contents": note_contents,
                 "tags": tags,
                 "graph": graph,
+                "versions": versions,
             },
         )
     finally:

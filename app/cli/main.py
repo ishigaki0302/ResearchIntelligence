@@ -42,6 +42,9 @@ app.add_typer(dedup_app)
 backup_app = typer.Typer(name="backup", help="Backup and restore")
 app.add_typer(backup_app)
 
+version_app = typer.Typer(name="version", help="Manage paper versions")
+app.add_typer(version_app)
+
 
 @tag_app.command("add")
 def tag_add(
@@ -1184,6 +1187,129 @@ def analytics_graph_stats(
             for item in result["top_pagerank"][:5]:
                 typer.echo(f"  [{item['pagerank']:.4f}] {item['title'][:70]}")
             typer.echo(f"\nCommunities: {result['community_count']}")
+    finally:
+        session.close()
+
+
+@version_app.command("link")
+def version_link(
+    id1: int = typer.Argument(..., help="First item ID"),
+    id2: int = typer.Argument(..., help="Second item ID"),
+):
+    """Link two items as versions of the same paper."""
+    from sqlalchemy import select
+
+    from app.core.db import get_session, init_db
+    from app.core.models import Item
+
+    init_db()
+    session = get_session()
+    try:
+        item1 = session.get(Item, id1)
+        item2 = session.get(Item, id2)
+        if not item1:
+            typer.echo(f"Item {id1} not found", err=True)
+            raise typer.Exit(1)
+        if not item2:
+            typer.echo(f"Item {id2} not found", err=True)
+            raise typer.Exit(1)
+
+        # Determine group id: prefer existing group, otherwise use lowest item id
+        group_id = item1.version_group_id or item2.version_group_id or min(id1, id2)
+
+        # Update all items in both groups to share the same group_id
+        old_groups = {g for g in [item1.version_group_id, item2.version_group_id] if g}
+        items_to_update = [item1, item2]
+        if old_groups:
+            others = (
+                session.execute(select(Item).where(Item.version_group_id.in_(old_groups)))
+                .scalars()
+                .all()
+            )
+            items_to_update.extend(others)
+
+        seen = set()
+        for it in items_to_update:
+            if it.id in seen:
+                continue
+            seen.add(it.id)
+            it.version_group_id = group_id
+            if not it.version_label:
+                it.version_label = it.venue_instance or it.venue or f"item #{it.id}"
+
+        session.commit()
+        typer.echo(f"Linked items {id1} and {id2} in version group {group_id}")
+    finally:
+        session.close()
+
+
+@version_app.command("list")
+def version_list(
+    item_id: int = typer.Argument(..., help="Item ID"),
+):
+    """List all versions of a paper."""
+    from sqlalchemy import select
+
+    from app.core.db import get_session, init_db
+    from app.core.models import Item
+
+    init_db()
+    session = get_session()
+    try:
+        item = session.get(Item, item_id)
+        if not item:
+            typer.echo(f"Item {item_id} not found", err=True)
+            raise typer.Exit(1)
+
+        if not item.version_group_id:
+            typer.echo(f"Item {item_id} is not part of a version group.")
+            return
+
+        versions = (
+            session.execute(
+                select(Item)
+                .where(Item.version_group_id == item.version_group_id)
+                .order_by(Item.version_date.asc().nulls_last(), Item.id.asc())
+            )
+            .scalars()
+            .all()
+        )
+
+        typer.echo(f"Version group {item.version_group_id} ({len(versions)} versions):\n")
+        for v in versions:
+            marker = " <--" if v.id == item_id else ""
+            typer.echo(
+                f"  [{v.id}] {v.version_label or '?'} | "
+                f"{v.venue_instance or v.venue or '?'} | "
+                f"{v.version_date or v.date or '?'}{marker}"
+            )
+    finally:
+        session.close()
+
+
+@version_app.command("unlink")
+def version_unlink(
+    item_id: int = typer.Argument(..., help="Item ID to remove from version group"),
+):
+    """Remove an item from its version group."""
+    from app.core.db import get_session, init_db
+    from app.core.models import Item
+
+    init_db()
+    session = get_session()
+    try:
+        item = session.get(Item, item_id)
+        if not item:
+            typer.echo(f"Item {item_id} not found", err=True)
+            raise typer.Exit(1)
+
+        if not item.version_group_id:
+            typer.echo(f"Item {item_id} is not part of a version group.")
+            return
+
+        item.version_group_id = None
+        session.commit()
+        typer.echo(f"Removed item {item_id} from its version group.")
     finally:
         session.close()
 

@@ -97,17 +97,24 @@ def upsert_item(
     tags: list[str] | None = None,
     pdf_source: str | Path | None = None,
     content_path: str | None = None,
+    version_label: str | None = None,
 ) -> tuple[Item, bool]:
     """Insert or update an item. Returns (item, created).
 
     Idempotency: checks external IDs first, then bibtex_key, then (title+year) match.
+    If an external ID matches but venue differs, a new version is created and linked
+    via version_group_id.
     """
     # 1. Check external IDs for existing item
     existing = None
+    is_new_version = False
     if external_ids:
         for id_type, id_value in external_ids.items():
             existing = find_item_by_external_id(session, id_type, id_value)
             if existing:
+                # Check if venue differs → new version instead of update
+                if venue and existing.venue and venue != existing.venue:
+                    is_new_version = True
                 break
 
     # 2. Check bibtex_key
@@ -123,9 +130,9 @@ def upsert_item(
             )
         ).scalar_one_or_none()
 
-    created = existing is None
+    created = existing is None or is_new_version
 
-    if existing:
+    if existing and not is_new_version:
         item = existing
         # Update fields if they were empty
         if not item.abstract and abstract:
@@ -159,9 +166,27 @@ def upsert_item(
             bibtex_key=bibtex_key,
             bibtex_raw=bibtex_raw,
             content_path=content_path,
+            version_label=version_label,
+            version_date=date,
         )
         session.add(item)
         session.flush()  # get item.id
+
+        # Set up version group if this is a new version of an existing item
+        if is_new_version and existing:
+            # Determine the group id: use existing's group or existing's own id
+            group_id = existing.version_group_id or existing.id
+            item.version_group_id = group_id
+            # Also set the existing item's group id if not already set
+            if not existing.version_group_id:
+                existing.version_group_id = group_id
+                if not existing.version_label:
+                    existing.version_label = existing.venue_instance or existing.venue or "v1"
+                if not existing.version_date:
+                    existing.version_date = existing.date
+            if not item.version_label:
+                item.version_label = venue_instance or venue or "new version"
+            session.flush()
 
         # Authors (deduplicate by author_id)
         if authors:
