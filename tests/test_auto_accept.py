@@ -20,12 +20,13 @@ def _create_watch(session):
 
 
 def _create_inbox_item(session, watch, **kwargs):
+    from sqlalchemy import func, select as sa_select
+
+    count = session.execute(sa_select(func.count(InboxItem.id))).scalar() + 1
     defaults = {
         "watch_id": watch.id,
         "source_id_type": "arxiv",
-        "source_id_value": f"2024.{session.execute(
-            __import__('sqlalchemy').select(__import__('sqlalchemy').func.count(InboxItem.id))
-        ).scalar() + 1:05d}",
+        "source_id_value": f"2024.{count:05d}",
         "title": "A Good Paper on Machine Learning Transformers",
         "authors_json": json.dumps(["Alice Smith", "Bob Jones"]),
         "year": 2024,
