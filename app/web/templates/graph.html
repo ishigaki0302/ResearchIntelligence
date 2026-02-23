@@ -32,6 +32,11 @@ function addNode(info, group) {
 addNode(data.center, 'center');
 (data.cites || []).forEach(c => addNode(c, 'cites'));
 (data.cited_by || []).forEach(c => addNode(c, 'cited_by'));
+(data.unresolved_refs || []).forEach(r => {
+    const title = (r.context && r.context.title) || r.raw_cite || '(unknown)';
+    const id = r.ref_id || ('u_' + r.citation_id);
+    addNode({id, title, year: null}, 'unresolved');
+});
 
 const links = (data.edges || []).map(e => ({source: e.src, target: e.dst}));
 
@@ -45,6 +50,10 @@ const sim = d3.forceSimulation(nodes)
 
 const link = svg.selectAll('line').data(links).join('line')
     .attr('stroke', '#999').attr('stroke-opacity', 0.6)
+    .attr('stroke-dasharray', d => {
+        const tid = typeof d.target === 'object' ? d.target.id : d.target;
+        return (typeof tid === 'string' && tid.startsWith('u_')) ? '4,3' : null;
+    })
     .attr('marker-end', 'url(#arrow)');
 
 svg.append('defs').append('marker')
@@ -54,7 +63,7 @@ svg.append('defs').append('marker')
     .attr('orient', 'auto-start-reverse')
     .append('path').attr('d', 'M 0 0 L 10 5 L 0 10 z').attr('fill', '#999');
 
-const colors = {center: '#2563eb', cites: '#059669', cited_by: '#d97706'};
+const colors = {center: '#2563eb', cites: '#059669', cited_by: '#d97706', unresolved: '#9ca3af'};
 const node = svg.selectAll('g').data(nodes).join('g')
     .call(d3.drag()
         .on('start', (e,d) => { if(!e.active) sim.alphaTarget(0.3).restart(); d.fx=d.x; d.fy=d.y; })
@@ -62,10 +71,10 @@ const node = svg.selectAll('g').data(nodes).join('g')
         .on('end', (e,d) => { if(!e.active) sim.alphaTarget(0); d.fx=null; d.fy=null; })
     );
 
-node.append('circle').attr('r', d => d.group === 'center' ? 10 : 7)
+node.append('circle').attr('r', d => d.group === 'center' ? 10 : d.group === 'unresolved' ? 5 : 7)
     .attr('fill', d => colors[d.group])
-    .attr('cursor', 'pointer')
-    .on('click', (e, d) => window.location.href = '/item/' + d.id);
+    .attr('cursor', d => d.group === 'unresolved' ? 'default' : 'pointer')
+    .on('click', (e, d) => { if (d.group !== 'unresolved') window.location.href = '/item/' + d.id; });
 
 node.append('text')
     .text(d => d.title.length > 30 ? d.title.slice(0,30)+'...' : d.title)
@@ -81,6 +90,7 @@ sim.on('tick', () => {
 <div style="margin-top:1rem;" class="meta">
     <span style="color:#2563eb;">&#9679;</span> 中心 &nbsp;
     <span style="color:#059669;">&#9679;</span> 引用先 &nbsp;
-    <span style="color:#d97706;">&#9679;</span> 被引用
+    <span style="color:#d97706;">&#9679;</span> 被引用 &nbsp;
+    <span style="color:#9ca3af;">&#9679;</span> DB外参照
 </div>
 {% endblock %}

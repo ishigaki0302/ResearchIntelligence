@@ -360,8 +360,10 @@ def get_citation_subgraph(session: Session, item_id: int, depth: int = 1) -> dic
                 edges.append({"src": item_id, "dst": dst.id})
                 seen_items.add(dst.id)
         else:
+            ref_id = f"u_{c.id}"
             ref_info = {
                 "citation_id": c.id,
+                "ref_id": ref_id,
                 "raw_cite": (c.raw_cite or "")[:200],
                 "dst_key": c.dst_key,
                 "source": c.source,
@@ -372,6 +374,7 @@ def get_citation_subgraph(session: Session, item_id: int, depth: int = 1) -> dic
                 except (json.JSONDecodeError, TypeError):
                     pass
             unresolved_refs.append(ref_info)
+            edges.append({"src": item_id, "dst": ref_id})
 
     # Incoming citations (... cites this item)
     in_cits = session.execute(select(Citation).where(Citation.dst_item_id == item_id)).scalars().all()
