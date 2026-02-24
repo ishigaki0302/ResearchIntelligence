@@ -6,13 +6,19 @@ All imports are idempotent.
 
 import logging
 import re
+import unicodedata
 from pathlib import Path
 from typing import Any
 
+import requests
 from sqlalchemy.orm import Session
 
 from app.connectors.acl import fetch_acl_papers
-from app.core.bibtex import parse_author_string, parse_bibtex_file
+from app.connectors.semantic_scholar import (
+    fetch_s2_paper_details,
+    search_s2_by_title,
+)
+from app.core.bibtex import parse_author_string, parse_bibtex_file, parse_bibtex_string
 from app.core.db import get_session, init_db
 from app.core.service import (
     add_item_to_collection,
@@ -175,6 +181,8 @@ def import_url(
             external_ids={"url": url},
         )
         session.commit()
+        item_id = item.id
+        item_title = item.title
     except Exception:
         session.rollback()
         raise
@@ -182,7 +190,7 @@ def import_url(
         if own_session:
             session.close()
 
-    return {"item_id": item.id, "created": created, "title": item.title}
+    return {"item_id": item_id, "created": created, "title": item_title}
 
 
 def import_acl(
@@ -271,6 +279,162 @@ def import_acl(
     }
 
 
+def _title_score(query: str, candidate: str) -> float:
+    """Score similarity between query title and a candidate title (0.0–1.0)."""
+
+    def _normalize(s: str) -> str:
+        s = unicodedata.normalize("NFKD", s)
+        s = "".join(c for c in s if not unicodedata.combining(c))
+        return re.sub(r"[^\w\s]", "", s).lower().strip()
+
+    q = _normalize(query)
+    c = _normalize(candidate)
+    if q == c:
+        return 1.0
+    if q in c or c in q:
+        return 0.8
+    q_words = set(q.split())
+    c_words = set(c.split())
+    if not q_words or not c_words:
+        return 0.0
+    overlap = len(q_words & c_words)
+    return 0.7 * overlap / max(len(q_words), len(c_words))
+
+
+def import_by_title(query: str, session: Session | None = None) -> dict[str, Any]:
+    """Import a paper by title, resolving metadata via Semantic Scholar + arXiv.
+
+    Returns: {"item_id": int, "created": bool, "title": str, "source": str}
+    """
+    own_session = session is None
+    if own_session:
+        init_db()
+        session = get_session()
+
+    try:
+        # 1. Search S2 for candidates
+        candidates = search_s2_by_title(query)
+
+        # 2. Score and pick best match
+        best = None
+        best_score = 0.0
+        for cand in candidates:
+            cand_title = cand.get("title") or ""
+            score = _title_score(query, cand_title)
+            if score > best_score:
+                best_score = score
+                best = cand
+
+        if best and best_score >= 0.8:
+            ext_ids = best.get("externalIds") or {}
+            arxiv_id = ext_ids.get("ArXiv")
+
+            if arxiv_id:
+                # 3a. Fetch arXiv BibTeX for richest metadata
+                bib_url = f"https://arxiv.org/bibtex/{arxiv_id}"
+                try:
+                    resp = requests.get(bib_url, timeout=15)
+                    resp.raise_for_status()
+                    entries = parse_bibtex_string(resp.text)
+                except Exception as e:
+                    logger.warning(f"Failed to fetch arXiv BibTeX for {arxiv_id}: {e}")
+                    entries = []
+
+                if entries:
+                    entry = entries[0]
+                    etype = entry.get("ENTRYTYPE", "article")
+                    title = re.sub(r"[{}]", "", entry.get("title", query).strip())
+                    author_str = entry.get("author", "")
+                    authors = parse_author_string(author_str) if author_str else []
+                    year = None
+                    if "year" in entry:
+                        try:
+                            year = int(entry["year"])
+                        except (ValueError, TypeError):
+                            pass
+                    abstract = re.sub(r"[{}]", "", entry.get("abstract", "")).strip()
+                    url = entry.get("url", f"https://arxiv.org/abs/{arxiv_id}")
+                    bib_key = entry.get("ID", "")
+
+                    raw_lines = [f"@{etype}{{{bib_key},"]
+                    for k, v in sorted(entry.items()):
+                        if k in ("ENTRYTYPE", "ID"):
+                            continue
+                        raw_lines.append(f"  {k} = {{{v}}},")
+                    raw_lines.append("}")
+                    bibtex_raw = "\n".join(raw_lines)
+
+                    item, created = upsert_item(
+                        session,
+                        title=title,
+                        authors=authors,
+                        year=year,
+                        abstract=abstract,
+                        source_url=url,
+                        bibtex_key=bib_key or None,
+                        bibtex_raw=bibtex_raw,
+                        external_ids={"arxiv": arxiv_id},
+                    )
+                    session.commit()
+                    item_id = item.id
+                    item_title = item.title
+                    return {"item_id": item_id, "created": created, "title": item_title, "source": "arxiv"}
+
+            # 3b. No arXiv ID — fetch full S2 details
+            paper_id = best.get("paperId", "")
+            details = fetch_s2_paper_details(paper_id) if paper_id else None
+            if details:
+                title = details.get("title") or query
+                year = details.get("year")
+                abstract = details.get("abstract") or ""
+                venue_obj = details.get("publicationVenue") or {}
+                venue = venue_obj.get("name") or details.get("venue") or None
+                authors_raw = details.get("authors") or []
+                authors = [a.get("name", "") for a in authors_raw if a.get("name")]
+                s2_ext = details.get("externalIds") or {}
+                doi = s2_ext.get("DOI")
+                external_ids = {"s2": paper_id}
+                if doi:
+                    external_ids["doi"] = doi
+            else:
+                title = best.get("title") or query
+                year = best.get("year")
+                abstract = ""
+                venue = None
+                authors_raw = best.get("authors") or []
+                authors = [a.get("name", "") for a in authors_raw if a.get("name")]
+                external_ids = {"s2": paper_id} if paper_id else None
+
+            item, created = upsert_item(
+                session,
+                title=title,
+                authors=authors,
+                year=year,
+                abstract=abstract,
+                venue=venue,
+                external_ids=external_ids,
+            )
+            session.commit()
+            item_id = item.id
+            item_title = item.title
+            return {"item_id": item_id, "created": created, "title": item_title, "source": "s2"}
+
+        # 4. No match — import as placeholder
+        logger.warning(f"No Semantic Scholar match found for title: {query!r} (best score={best_score:.2f})")
+        item, created = upsert_item(session, title=query)
+        session.commit()
+        item_id = item.id
+        item_title = item.title
+        return {"item_id": item_id, "created": created, "title": item_title, "source": "placeholder"}
+
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        if own_session:
+            session.close()
+
+
 def parse_import_spec(spec: str) -> dict[str, Any]:
     """Parse an import spec string like 'acl:2024{main,findings}' or 'bib:/path/file.bib'.
 
@@ -300,5 +464,9 @@ def parse_import_spec(spec: str) -> dict[str, Any]:
     if spec.startswith("url:"):
         url = spec[4:]
         return {"type": "url", "args": {"url": url}}
+
+    # Title: title:Paper Title Here
+    if spec.startswith("title:"):
+        return {"type": "title", "args": {"query": spec[6:]}}
 
     raise ValueError(f"Unknown import spec: {spec}")

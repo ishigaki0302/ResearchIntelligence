@@ -134,7 +134,14 @@ def import_cmd(
 ):
     """Import papers from various sources."""
     from app.core.db import init_db
-    from app.pipelines.importer import import_acl, import_bibtex, import_pdf, import_url, parse_import_spec
+    from app.pipelines.importer import (
+        import_acl,
+        import_bibtex,
+        import_by_title,
+        import_pdf,
+        import_url,
+        parse_import_spec,
+    )
 
     init_db()
 
@@ -168,6 +175,17 @@ def import_cmd(
         typer.echo(
             f"{'Created' if result['created'] else 'Already exists'}: {result['title']} (id={result['item_id']})"
         )
+
+    elif src_type == "title":
+        typer.echo(f"Searching for: {args['query']!r}")
+        result = import_by_title(args["query"])
+        source_label = {"arxiv": "arXiv BibTeX", "s2": "Semantic Scholar", "placeholder": "placeholder (no match)"}.get(
+            result["source"], result["source"]
+        )
+        status = "Created" if result["created"] else "Already exists"
+        typer.echo(f"{status} [{source_label}]: {result['title']} (id={result['item_id']})")
+        if result["source"] == "placeholder":
+            typer.echo("Warning: no Semantic Scholar match found — imported as placeholder.", err=True)
 
     else:
         typer.echo(f"Unknown import type: {src_type}", err=True)
