@@ -94,6 +94,13 @@ def search_s2_by_title(title: str) -> list[dict]:
         return []
 
 
+def fetch_s2_paper_details(paper_id: str) -> dict | None:
+    """Fetch full paper details from Semantic Scholar by paper ID."""
+    url = f"{S2_API}/paper/{paper_id}"
+    params = {"fields": "title,year,authors,abstract,venue,externalIds,publicationVenue"}
+    return _cached_get(url, params)
+
+
 def _fetch_references(paper_id: str) -> list[dict] | None:
     """Fetch references for a single paper_id. Returns None on miss."""
     url = f"{S2_API}/paper/{paper_id}/references"
