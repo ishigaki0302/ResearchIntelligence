@@ -55,7 +55,7 @@ jobs:
           ri sync run --since "$SINCE" --out data/cache/sync/digest.md || true
 
       - name: Upload digest artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: sync-digest-${{ github.run_number }}
           path: |
