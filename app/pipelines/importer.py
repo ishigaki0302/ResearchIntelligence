@@ -20,11 +20,7 @@ from app.connectors.semantic_scholar import (
 )
 from app.core.bibtex import parse_author_string, parse_bibtex_file, parse_bibtex_string
 from app.core.db import get_session, init_db
-from app.core.service import (
-    add_item_to_collection,
-    get_or_create_collection,
-    upsert_item,
-)
+from app.core.service import upsert_item
 
 logger = logging.getLogger(__name__)
 
@@ -214,15 +210,6 @@ def import_acl(
     papers = fetch_acl_papers(event, year, volumes)
     logger.info(f"Fetched {len(papers)} papers from {event.upper()} {year}")
 
-    # Create collection
-    vol_str = ",".join(volumes) if volumes else "all"
-    coll_name = f"{event.upper()} {year} ({vol_str})"
-    collection = get_or_create_collection(
-        session,
-        coll_name,
-        spec={"event": event, "year": year, "volumes": volumes},
-    )
-
     imported = 0
     skipped = 0
 
@@ -234,7 +221,7 @@ def import_acl(
             if paper.get("doi"):
                 ext_ids["doi"] = paper["doi"]
 
-            tags = []
+            tags = [event.lower()]
             if paper.get("volume_type"):
                 tags.append(f"acl/{paper['volume_type']}")
 
@@ -250,10 +237,8 @@ def import_acl(
                 bibtex_key=paper.get("bibtex_key"),
                 bibtex_raw=paper.get("bibtex_raw"),
                 external_ids=ext_ids if ext_ids else None,
-                tags=tags if tags else None,
+                tags=tags,
             )
-
-            add_item_to_collection(session, item, collection)
 
             if created:
                 imported += 1
@@ -272,7 +257,7 @@ def import_acl(
         "event": event.upper(),
         "year": year,
         "volumes": volumes,
-        "collection": coll_name,
+        "event_tag": event.lower(),
         "imported": imported,
         "skipped": skipped,
         "total": len(papers),

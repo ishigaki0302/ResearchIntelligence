@@ -1,7 +1,7 @@
 """Tests for P19 — dedup detect & merge."""
 
-from app.core.models import Citation, CollectionItem, Item, ItemAuthor
-from app.core.service import add_tag_to_item, get_or_create_author, get_or_create_collection, upsert_item
+from app.core.models import Citation, Item, ItemAuthor
+from app.core.service import add_tag_to_item, get_or_create_author, upsert_item
 from app.pipelines.dedup import detect_duplicates, merge_items
 
 
@@ -82,10 +82,6 @@ def test_merge_apply(tmp_db):
     # Add tag to source
     add_tag_to_item(session, src.id, "transfer-tag")
 
-    # Add collection membership to source
-    coll = get_or_create_collection(session, "test-coll")
-    session.add(CollectionItem(collection_id=coll.id, item_id=src.id))
-
     # Add citation from source
     cit = Citation(src_item_id=src.id, dst_key="some_key", source="bibtex")
     session.add(cit)
@@ -96,7 +92,6 @@ def test_merge_apply(tmp_db):
 
     assert result["dry_run"] is False
     assert result["moved"]["tags"] >= 1
-    assert result["moved"]["collections"] >= 1
     assert result["moved"]["citations_out"] >= 1
 
     # Verify source is marked as merged

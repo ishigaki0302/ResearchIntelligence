@@ -8,26 +8,12 @@
         <div class="stat-num">{{ item_count }}</div>
         <div class="stat-label">登録数</div>
     </div>
-    <div class="stat-box">
-        <div class="stat-num">{{ collections|length }}</div>
-        <div class="stat-label">コレクション</div>
-    </div>
 </div>
 
 <form class="search-form" action="/search" method="get">
     <input type="text" name="q" placeholder="論文を検索..." class="search-input">
     <button type="submit">検索</button>
 </form>
-
-{% if collections %}
-<h2>コレクション</h2>
-{% for coll in collections %}
-<div class="card">
-    <h3>{{ coll.name }}</h3>
-    <div class="meta">作成日: {{ coll.created_at.strftime('%Y-%m-%d') if coll.created_at else '?' }}</div>
-</div>
-{% endfor %}
-{% endif %}
 
 {% if recent_items %}
 <div style="display:flex; align-items:baseline; justify-content:space-between;">

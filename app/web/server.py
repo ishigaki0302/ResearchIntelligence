@@ -12,7 +12,7 @@ from sqlalchemy import func, select
 
 from app.core.config import resolve_path
 from app.core.db import get_session, init_db
-from app.core.models import Citation, Collection, InboxItem, Item, ItemId, Job, Note, Tag, ViewHistory, Watch
+from app.core.models import Citation, InboxItem, Item, ItemId, Job, Note, Tag, ViewHistory, Watch
 from app.core.service import add_tag_to_item, list_tags_for_item, remove_tag_from_item
 from app.graph.citations import get_citation_subgraph
 from app.indexing.engine import hybrid_search
@@ -52,15 +52,12 @@ def home(request: Request):
         item_count = session.execute(select(func.count(Item.id))).scalar()
         recent = session.execute(select(Item).order_by(Item.created_at.desc()).limit(10)).scalars().all()
 
-        collections = session.execute(select(Collection).order_by(Collection.created_at.desc())).scalars().all()
-
         return templates.TemplateResponse(
             "home.html",
             {
                 "request": request,
                 "item_count": item_count,
                 "recent_items": recent,
-                "collections": collections,
             },
         )
     finally:
@@ -736,20 +733,16 @@ def history_page(request: Request):
 @app.get("/analytics", response_class=HTMLResponse)
 def analytics_page(request: Request):
     from app.analytics.trends import (
-        items_by_year_collection,
         items_by_year_tag,
         items_by_year_venue,
         top_keyphrases_by_year,
-        watch_collection_growth,
     )
 
     session = get_session()
     try:
         data = {
             "year_venue": items_by_year_venue(session),
-            "year_collection": items_by_year_collection(session),
             "year_tag": items_by_year_tag(session),
-            "watch_growth": watch_collection_growth(session),
             "keyphrases": top_keyphrases_by_year(session, top_n=15),
         }
 
@@ -818,17 +811,3 @@ def papers_list(request: Request, page: int = Query(1, ge=1), per_page: int = Qu
         session.close()
 
 
-@app.get("/collections", response_class=HTMLResponse)
-def collections_list(request: Request):
-    session = get_session()
-    try:
-        collections = session.execute(select(Collection).order_by(Collection.created_at.desc())).scalars().all()
-        return templates.TemplateResponse(
-            "collections.html",
-            {
-                "request": request,
-                "collections": collections,
-            },
-        )
-    finally:
-        session.close()

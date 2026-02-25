@@ -103,26 +103,6 @@
 <p class="meta">データがありません。</p>
 {% endif %}
 
-<h2>年 × コレクション</h2>
-{% if data.year_collection %}
-<table class="card" style="width:100%; border-collapse:collapse;">
-    <tr style="border-bottom:1px solid var(--border);">
-        <th style="text-align:left; padding:0.5rem;">年</th>
-        <th style="text-align:left; padding:0.5rem;">コレクション</th>
-        <th style="text-align:right; padding:0.5rem;">件数</th>
-    </tr>
-    {% for row in data.year_collection %}
-    <tr style="border-bottom:1px solid var(--border);">
-        <td style="padding:0.5rem;">{{ row.year }}</td>
-        <td style="padding:0.5rem;">{{ row.collection }}</td>
-        <td style="text-align:right; padding:0.5rem;">{{ row.count }}</td>
-    </tr>
-    {% endfor %}
-</table>
-{% else %}
-<p class="meta">データがありません。</p>
-{% endif %}
-
 <h2>年 × タグ</h2>
 {% if data.year_tag %}
 <table class="card" style="width:100%; border-collapse:collapse;">
@@ -141,26 +121,6 @@
 </table>
 {% else %}
 <p class="meta">データがありません。</p>
-{% endif %}
-
-<h2>Watch コレクション成長</h2>
-{% if data.watch_growth %}
-<table class="card" style="width:100%; border-collapse:collapse;">
-    <tr style="border-bottom:1px solid var(--border);">
-        <th style="text-align:left; padding:0.5rem;">コレクション</th>
-        <th style="text-align:left; padding:0.5rem;">日付</th>
-        <th style="text-align:right; padding:0.5rem;">累計</th>
-    </tr>
-    {% for row in data.watch_growth %}
-    <tr style="border-bottom:1px solid var(--border);">
-        <td style="padding:0.5rem;">{{ row.collection }}</td>
-        <td style="padding:0.5rem;">{{ row.date }}</td>
-        <td style="text-align:right; padding:0.5rem;">{{ row.cumulative_count }}</td>
-    </tr>
-    {% endfor %}
-</table>
-{% else %}
-<p class="meta">Watch コレクションがまだありません。</p>
 {% endif %}
 
 <h2>年別キーフレーズ</h2>
