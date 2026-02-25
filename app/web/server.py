@@ -173,6 +173,18 @@ def search_page(
         results = all_results[start : start + per_page]
 
         all_tags = session.execute(select(Tag).order_by(Tag.name)).scalars().all()
+        all_years = [
+            r[0]
+            for r in session.execute(
+                select(Item.year).where(Item.year.is_not(None)).distinct().order_by(Item.year.desc())
+            ).all()
+        ]
+        all_venues = [
+            r[0]
+            for r in session.execute(
+                select(Item.venue).where(Item.venue.is_not(None)).distinct().order_by(Item.venue)
+            ).all()
+        ]
 
         return templates.TemplateResponse(
             "search.html",
@@ -185,6 +197,8 @@ def search_page(
                 "venue": venue or "",
                 "tag": tag or "",
                 "all_tags": all_tags,
+                "all_years": all_years,
+                "all_venues": all_venues,
                 "item_type": item_type or "",
                 "page": page,
                 "per_page": per_page,
