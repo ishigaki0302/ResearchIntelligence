@@ -223,7 +223,7 @@ def import_acl(
 
             tags = [event.lower()]
             if paper.get("volume_type"):
-                tags.append(f"acl/{paper['volume_type']}")
+                tags.append(f"{event.lower()}/{paper['volume_type']}")
 
             item, created = upsert_item(
                 session,

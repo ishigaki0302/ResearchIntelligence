@@ -73,6 +73,24 @@ function downloadAndExtract() {
 
 <div class="card" style="margin-bottom: 1rem;">
     <h2 style="margin-top: 0;">タグ</h2>
+    <div style="margin-bottom:0.5rem; display:flex; gap:0.4rem; flex-wrap:wrap;">
+        <form action="/item/{{ item.id }}/tag" method="post" style="display:inline;">
+            <input type="hidden" name="tag_name" value="read">
+            <button type="submit" class="btn btn-secondary"
+                style="font-size:0.8em; padding:0.2rem 0.6rem;
+                       {% if 'read' in tags %}background:#28a745; color:#fff;{% endif %}">
+                {% if 'read' in tags %}✓ 既読{% else %}既読にする{% endif %}
+            </button>
+        </form>
+        <form action="/item/{{ item.id }}/tag" method="post" style="display:inline;">
+            <input type="hidden" name="tag_name" value="mine">
+            <button type="submit" class="btn btn-secondary"
+                style="font-size:0.8em; padding:0.2rem 0.6rem;
+                       {% if 'mine' in tags %}background:#6f42c1; color:#fff;{% endif %}">
+                {% if 'mine' in tags %}✓ 自分の論文{% else %}自分の論文にする{% endif %}
+            </button>
+        </form>
+    </div>
     <div style="display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.5rem;">
     {% for tag in tags %}
         <span class="badge" style="display: inline-flex; align-items: center; gap: 0.3rem;">

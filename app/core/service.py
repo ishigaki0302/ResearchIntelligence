@@ -22,6 +22,47 @@ from app.core.models import (
     Tag,
 )
 
+_VENUE_NAMES = frozenset(
+    {
+        "acl",
+        "emnlp",
+        "naacl",
+        "eacl",
+        "coling",
+        "ijcnlp",
+        "aacl",
+        "iclr",
+        "neurips",
+        "nips",
+        "icml",
+        "aaai",
+        "ijcai",
+    }
+)
+_STATUS_NAMES = frozenset(
+    {
+        "read",
+        "mine",
+        "starred",
+        "to-read",
+        "important",
+        "unread",
+    }
+)
+
+
+def infer_tag_kind(name: str) -> str:
+    """Infer tag kind from tag name using naming conventions."""
+    if name.startswith("watch/"):
+        return "source"
+    if name in _STATUS_NAMES:
+        return "status"
+    if name in _VENUE_NAMES:
+        return "venue"
+    if "/" in name and name.split("/", 1)[0] in _VENUE_NAMES:
+        return "track"
+    return "topic"
+
 
 def _library_dir() -> Path:
     cfg = get_config()
@@ -45,11 +86,12 @@ def get_or_create_author(session: Session, name: str) -> Author:
     return author
 
 
-def get_or_create_tag(session: Session, name: str) -> Tag:
+def get_or_create_tag(session: Session, name: str, kind: str | None = None) -> Tag:
     """Find or create a tag."""
     tag = session.execute(select(Tag).where(Tag.name == name)).scalar_one_or_none()
     if tag is None:
-        tag = Tag(name=name)
+        effective_kind = kind if kind is not None else infer_tag_kind(name)
+        tag = Tag(name=name, kind=effective_kind)
         session.add(tag)
         session.flush()
     return tag
@@ -281,9 +323,11 @@ def ensure_note(session: Session, item: Item) -> Note:
     return note
 
 
-def add_tag_to_item(session: Session, item_id: int, tag_name: str, source: str = "manual") -> ItemTag:
+def add_tag_to_item(
+    session: Session, item_id: int, tag_name: str, source: str = "manual", kind: str | None = None
+) -> ItemTag:
     """Add a tag to an item. Idempotent — returns existing ItemTag if already present."""
-    tag = get_or_create_tag(session, tag_name)
+    tag = get_or_create_tag(session, tag_name, kind=kind)
     existing = session.execute(
         select(ItemTag).where(ItemTag.item_id == item_id, ItemTag.tag_id == tag.id)
     ).scalar_one_or_none()
@@ -318,6 +362,15 @@ def list_tags_for_item(session: Session, item_id: int) -> list[str]:
         return []
     tags = session.execute(select(Tag).where(Tag.id.in_(tag_ids))).scalars().all()
     return sorted(t.name for t in tags)
+
+
+def list_tag_objects_for_item(session: Session, item_id: int) -> list[Tag]:
+    """Get Tag objects (including .kind) for an item."""
+    links = session.execute(select(ItemTag).where(ItemTag.item_id == item_id)).scalars().all()
+    tag_ids = [link.tag_id for link in links]
+    if not tag_ids:
+        return []
+    return session.execute(select(Tag).where(Tag.id.in_(tag_ids)).order_by(Tag.kind, Tag.name)).scalars().all()
 
 
 def add_citation(

@@ -62,19 +62,22 @@ def top_venues(session: Session, n: int = 15) -> list[dict]:
     return [{"venue": r[0], "count": r[1]} for r in rows]
 
 
-def top_tags(session: Session, n: int = 20) -> list[dict]:
+def top_tags(session: Session, n: int = 20, kinds: list | None = None) -> list[dict]:
     """Top tags by item count.
 
-    Returns: [{"tag": str, "count": int}, ...] ordered desc.
+    Returns: [{"tag": str, "kind": str, "count": int}, ...] ordered desc.
     """
-    rows = session.execute(
-        select(Tag.name, func.count(ItemTag.item_id))
+    q = (
+        select(Tag.name, Tag.kind, func.count(ItemTag.item_id))
         .join(ItemTag, ItemTag.tag_id == Tag.id)
-        .group_by(Tag.name)
+        .group_by(Tag.name, Tag.kind)
         .order_by(func.count(ItemTag.item_id).desc())
         .limit(n)
-    ).all()
-    return [{"tag": r[0], "count": r[1]} for r in rows]
+    )
+    if kinds is not None:
+        q = q.where(Tag.kind.in_(kinds))
+    rows = session.execute(q).all()
+    return [{"tag": r[0], "kind": r[1], "count": r[2]} for r in rows]
 
 
 def top_authors(session: Session, n: int = 20) -> list[dict]:
@@ -122,19 +125,22 @@ def items_by_year_venue(session: Session) -> list[dict]:
     return [{"year": r[0], "venue": r[1], "count": r[2]} for r in rows]
 
 
-def items_by_year_tag(session: Session) -> list[dict]:
+def items_by_year_tag(session: Session, kinds: list | None = None) -> list[dict]:
     """Aggregate item counts by year and tag.
 
     Returns: [{"year": int, "tag": str, "count": int}, ...]
     """
-    rows = session.execute(
+    q = (
         select(Item.year, Tag.name, func.count(Item.id))
         .join(ItemTag, ItemTag.item_id == Item.id)
         .join(Tag, Tag.id == ItemTag.tag_id)
         .where(Item.year.is_not(None))
         .group_by(Item.year, Tag.name)
         .order_by(Item.year, Tag.name)
-    ).all()
+    )
+    if kinds is not None:
+        q = q.where(Tag.kind.in_(kinds))
+    rows = session.execute(q).all()
     return [{"year": r[0], "tag": r[1], "count": r[2]} for r in rows]
 
 

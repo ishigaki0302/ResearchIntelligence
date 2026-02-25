@@ -1,6 +1,7 @@
 """FastAPI web server for the research index UI."""
 
 import json
+from collections import defaultdict
 from pathlib import Path
 from typing import Optional
 
@@ -178,7 +179,13 @@ def search_page(
         start = (page - 1) * per_page
         results = all_results[start : start + per_page]
 
-        all_tags = session.execute(select(Tag).order_by(Tag.name)).scalars().all()
+        all_tags_raw = session.execute(select(Tag).order_by(Tag.kind, Tag.name)).scalars().all()
+        _KIND_ORDER = ["status", "venue", "track", "source", "topic"]
+        _tags_by_kind = defaultdict(list)
+        for _t in all_tags_raw:
+            _tags_by_kind[_t.kind].append(_t)
+        all_tags_grouped = [(_k, _tags_by_kind[_k]) for _k in _KIND_ORDER if _tags_by_kind.get(_k)]
+        all_tags = all_tags_raw  # backward compat
         all_years = [
             r[0]
             for r in session.execute(
@@ -203,6 +210,7 @@ def search_page(
                 "venue": venue or "",
                 "tag": tag or "",
                 "all_tags": all_tags,
+                "all_tags_grouped": all_tags_grouped,
                 "all_years": all_years,
                 "all_venues": all_venues,
                 "item_type": item_type or "",
@@ -800,7 +808,7 @@ def analytics_page(request: Request):
         by_year = items_by_year(session)
         by_month = items_added_by_month(session)
         venues = top_venues(session, n=15)
-        tags = top_tags(session, n=20)
+        tags = top_tags(session, n=20, kinds=["topic", "venue"])
         authors = top_authors(session, n=20)
         by_type = items_by_type(session)
 
