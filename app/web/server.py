@@ -809,5 +809,3 @@ def papers_list(request: Request, page: int = Query(1, ge=1), per_page: int = Qu
         )
     finally:
         session.close()
-
-

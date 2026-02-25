@@ -79,8 +79,7 @@ def migrate_collections(
         # Check if tables still exist
         with engine.connect() as conn:
             tables = [
-                row[0]
-                for row in conn.execute(text("SELECT name FROM sqlite_master WHERE type='table'")).fetchall()
+                row[0] for row in conn.execute(text("SELECT name FROM sqlite_master WHERE type='table'")).fetchall()
             ]
 
         if "collections" not in tables:
