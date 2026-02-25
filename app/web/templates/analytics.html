@@ -2,6 +2,10 @@
 {% block title %}分析 — Research Intelligence{% endblock %}
 {% block content %}
 <h1>分析</h1>
+<p class="meta" style="margin-bottom:1rem;">
+    ライブラリに登録した文献の傾向を可視化します。会場別・タグ別の年次分布、頻出キーフレーズ、
+    引用ネットワーク分析（被引用数・PageRank）、トピッククラスタリングなどを確認できます。
+</p>
 
 <h2>クラスタ概要</h2>
 {% if cluster_data and cluster_data.clusters %}

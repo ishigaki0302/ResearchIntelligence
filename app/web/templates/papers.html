@@ -13,7 +13,7 @@
         {{ item.author_names[:3] | join(', ') }}{% if item.author_names|length > 3 %} et al.{% endif %}
         &middot; {{ item.year or '?' }}
         &middot; {{ item.venue_instance or item.venue or '' }}
-        <span class="badge">{{ item.type }}</span>
+        <span class="badge">{{ item.type | type_label }}</span>
         <span style="margin-left:0.5rem; color:var(--muted);">追加: {{ item.created_at.strftime('%Y-%m-%d') if item.created_at else '?' }}</span>
     </div>
 </div>

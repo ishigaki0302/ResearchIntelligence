@@ -15,7 +15,7 @@
         <input type="text" name="author" value="{{ author }}" placeholder="著者名" style="width:140px;">
         <label>年:</label>
         <input type="text" name="year" value="{{ year }}" placeholder="2024 or 2023:2024" style="width:120px;">
-        <label>Venue:</label>
+        <label>会場:</label>
         <input type="text" name="venue" value="{{ venue }}" placeholder="ACL" style="width:100px;">
         <label>タグ:</label>
         <select name="tag">
@@ -27,9 +27,9 @@
         <label>種別:</label>
         <select name="type">
             <option value="">すべて</option>
-            <option value="paper" {% if item_type == 'paper' %}selected{% endif %}>Paper</option>
-            <option value="blog" {% if item_type == 'blog' %}selected{% endif %}>Blog</option>
-            <option value="slide" {% if item_type == 'slide' %}selected{% endif %}>Slide</option>
+            <option value="paper" {% if item_type == 'paper' %}selected{% endif %}>論文</option>
+            <option value="blog" {% if item_type == 'blog' %}selected{% endif %}>ブログ</option>
+            <option value="slide" {% if item_type == 'slide' %}selected{% endif %}>スライド</option>
         </select>
         <label>件数:</label>
         <select name="per_page">
@@ -56,7 +56,7 @@
         {{ item.author_names[:3] | join(', ') }}{% if item.author_names|length > 3 %} et al.{% endif %}
         &middot; {{ item.year or '?' }}
         &middot; {{ item.venue_instance or item.venue or '' }}
-        <span class="badge">{{ item.type }}</span>
+        <span class="badge">{{ item.type | type_label }}</span>
         &middot; スコア: {{ "%.3f"|format(r.score) }}
     </div>
     {% if r.snippet %}

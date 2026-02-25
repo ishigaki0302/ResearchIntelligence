@@ -34,7 +34,41 @@ def _fromjson(value: str) -> list | dict:
         return []
 
 
+_TYPE_LABELS = {"paper": "論文", "blog": "ブログ", "slide": "スライド", "note": "ノート"}
+_STATUS_LABELS = {
+    "new": "新着",
+    "accepted": "承認済み",
+    "rejected": "却下済み",
+    "done": "完了",
+    "failed": "失敗",
+    "running": "実行中",
+    "pending": "待機中",
+    "merged": "統合済み",
+    "active": "有効",
+}
+_JOB_TYPE_LABELS = {
+    "sync": "同期",
+    "download_pdf": "PDF取得",
+    "index": "インデックス再構築",
+}
+
+
+def _type_label(value: str) -> str:
+    return _TYPE_LABELS.get(value, value)
+
+
+def _status_label(value: str) -> str:
+    return _STATUS_LABELS.get(value, value)
+
+
+def _job_type_label(value: str) -> str:
+    return _JOB_TYPE_LABELS.get(value, value)
+
+
 templates.env.filters["fromjson"] = _fromjson
+templates.env.filters["type_label"] = _type_label
+templates.env.filters["status_label"] = _status_label
+templates.env.filters["job_type_label"] = _job_type_label
 
 if STATIC_DIR.exists():
     app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")

@@ -10,8 +10,8 @@
 <div class="meta" style="margin-bottom: 1rem;">
     <strong>著者:</strong> {{ item.author_names | join(', ') or '不明' }}<br>
     <strong>年:</strong> {{ item.year or '?' }}
-    &middot; <strong>Venue:</strong> {{ item.venue_instance or item.venue or '—' }}
-    &middot; <strong>種別:</strong> <span class="badge">{{ item.type }}</span>
+    &middot; <strong>会場:</strong> {{ item.venue_instance or item.venue or '—' }}
+    &middot; <strong>種別:</strong> <span class="badge">{{ item.type | type_label }}</span>
     &middot; <strong>BibTeX Key:</strong> <code>{{ item.bibtex_key or '—' }}</code>
 </div>
 
@@ -93,7 +93,7 @@ function downloadAndExtract() {
 </div>
 
 {% if item.abstract %}
-<h2>Abstract</h2>
+<h2>要旨（Abstract）</h2>
 <div class="abstract">{{ item.abstract }}</div>
 {% endif %}
 
@@ -132,11 +132,11 @@ function copyBibtex() {
 <h2>引用関係</h2>
 <div class="card" style="margin-bottom: 1rem;">
     <div style="display: flex; gap: 1rem; margin-bottom: 1rem;">
-        <button onclick="showTab('refs')" id="tab-refs" style="font-weight:bold; border-bottom: 2px solid #007bff;">References</button>
-        <button onclick="showTab('citedby')" id="tab-citedby">Cited by</button>
-        <button onclick="showTab('similar')" id="tab-similar">Similar</button>
-        <button onclick="showTab('mentions')" id="tab-mentions">Mentioned in Notes</button>
-        <button onclick="showTab('graph')" id="tab-graph">Graph</button>
+        <button onclick="showTab('refs')" id="tab-refs" style="font-weight:bold; border-bottom: 2px solid #007bff;">参考文献</button>
+        <button onclick="showTab('citedby')" id="tab-citedby">被引用</button>
+        <button onclick="showTab('similar')" id="tab-similar">類似論文</button>
+        <button onclick="showTab('mentions')" id="tab-mentions">ノートで言及</button>
+        <button onclick="showTab('graph')" id="tab-graph">引用グラフ</button>
     </div>
 
     <div id="panel-refs">
