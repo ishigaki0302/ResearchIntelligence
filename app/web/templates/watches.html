@@ -1,28 +1,33 @@
 {% extends "base.html" %}
-{% block title %}Watch 一覧 — Research Intelligence{% endblock %}
+{% block title %}監視クエリ — Research Intelligence{% endblock %}
 {% block content %}
-<h1>Watch 一覧</h1>
+<h1>監視クエリ</h1>
+<p class="meta" style="margin-bottom:1rem;">
+    キーワードや検索条件を登録しておくと、arXiv・OpenAlex を定期的に検索して新着論文を自動発見します。
+    発見された論文は「受信トレイ」に蓄積され、承認するとライブラリに追加されます。
+    <code>ri watch run</code> コマンドまたは下の「実行」ボタンで手動実行もできます。
+</p>
 
 <div class="card">
-    <h2>Watch を追加</h2>
+    <h2>監視クエリを追加</h2>
     <form method="post" action="/watches" style="display:flex; gap:0.5rem; flex-wrap:wrap; align-items:end;">
         <div>
             <label class="meta">名前</label><br>
             <input type="text" name="name" required placeholder="my-watch">
         </div>
         <div>
-            <label class="meta">ソース</label><br>
+            <label class="meta">検索元</label><br>
             <select name="source">
                 <option value="arxiv">arXiv</option>
                 <option value="openalex">OpenAlex</option>
             </select>
         </div>
         <div>
-            <label class="meta">クエリ</label><br>
+            <label class="meta">検索クエリ</label><br>
             <input type="text" name="query" required placeholder="retrieval augmented generation" style="min-width:250px;">
         </div>
         <div>
-            <label class="meta">カテゴリ (arXiv)</label><br>
+            <label class="meta">カテゴリ（arXiv のみ）</label><br>
             <input type="text" name="category" placeholder="cs.CL">
         </div>
         <button type="submit">追加</button>
@@ -30,16 +35,16 @@
 </div>
 
 {% if watches %}
-<h2>登録済み Watch</h2>
+<h2>登録済みの監視クエリ</h2>
 {% for w in watches %}
 <div class="card" style="display:flex; justify-content:space-between; align-items:center;">
     <div>
         <h3>{{ w.name }}</h3>
         <p class="meta">
-            ソース: <span class="badge">{{ w.source }}</span>
-            クエリ: {{ w.query }}
+            検索元: <span class="badge">{{ w.source }}</span>
+            &middot; クエリ: {{ w.query }}
             {% if w.filters_json %}| フィルター: {{ w.filters_json }}{% endif %}
-            | {{ "有効" if w.enabled else "無効" }}
+            &middot; <span class="badge" style="background: {% if w.enabled %}#d1fae5; color:#059669{% else %}#f3f4f6; color:#6b7280{% endif %};">{{ "有効" if w.enabled else "無効" }}</span>
         </p>
     </div>
     <div style="display:flex; gap:0.5rem;">
@@ -49,12 +54,12 @@
             </button>
         </form>
         <form method="post" action="/watches/{{ w.id }}/run">
-            <button type="submit" style="font-size:0.8rem; padding:0.3rem 0.6rem;">実行</button>
+            <button type="submit" style="font-size:0.8rem; padding:0.3rem 0.6rem;">今すぐ実行</button>
         </form>
     </div>
 </div>
 {% endfor %}
 {% else %}
-<p class="meta">Watch がまだありません。上のフォームから追加してください。</p>
+<p class="meta">監視クエリがまだありません。上のフォームから追加してください。</p>
 {% endif %}
 {% endblock %}

@@ -1,21 +1,25 @@
 {% extends "base.html" %}
-{% block title %}Inbox — Research Intelligence{% endblock %}
+{% block title %}受信トレイ — Research Intelligence{% endblock %}
 {% block content %}
-<h1>Inbox</h1>
+<h1>受信トレイ</h1>
+<p class="meta" style="margin-bottom:1rem;">
+    監視クエリが自動発見した論文候補の一覧です。内容を確認して「承認」するとライブラリに追加されます。
+    「却下」した論文は候補から除外されます。レコメンド機能を使うと、過去の承認傾向をもとに関連度の高い論文を優先表示できます。
+</p>
 
 <div class="filter-row" style="margin-bottom:1rem; display:flex; gap:0.5rem; align-items:center;">
-    <label>ステータス:</label>
+    <label>表示:</label>
     <a href="/inbox?status=new" class="btn {% if current_status == 'new' %}{% else %}btn-secondary{% endif %}" style="font-size:0.8rem; padding:0.3rem 0.6rem;">新着</a>
-    <a href="/inbox?status=recommended" class="btn {% if current_status == 'recommended' %}{% else %}btn-secondary{% endif %}" style="font-size:0.8rem; padding:0.3rem 0.6rem;">推薦</a>
-    <a href="/inbox?status=auto-accept" class="btn {% if current_status == 'auto-accept' %}{% else %}btn-secondary{% endif %}" style="font-size:0.8rem; padding:0.3rem 0.6rem;">自動承認</a>
+    <a href="/inbox?status=recommended" class="btn {% if current_status == 'recommended' %}{% else %}btn-secondary{% endif %}" style="font-size:0.8rem; padding:0.3rem 0.6rem;">おすすめ</a>
+    <a href="/inbox?status=auto-accept" class="btn {% if current_status == 'auto-accept' %}{% else %}btn-secondary{% endif %}" style="font-size:0.8rem; padding:0.3rem 0.6rem;">自動承認候補</a>
     <a href="/inbox?status=accepted" class="btn btn-secondary" style="font-size:0.8rem; padding:0.3rem 0.6rem;">承認済み</a>
     <a href="/inbox?status=rejected" class="btn btn-secondary" style="font-size:0.8rem; padding:0.3rem 0.6rem;">却下済み</a>
     <a href="/inbox?status=all" class="btn btn-secondary" style="font-size:0.8rem; padding:0.3rem 0.6rem;">すべて</a>
     <form method="post" action="/inbox/recommend" style="margin-left:auto;">
-        <button type="submit" class="btn btn-secondary" style="font-size:0.8rem; padding:0.3rem 0.6rem;">レコメンド実行</button>
+        <button type="submit" class="btn btn-secondary" style="font-size:0.8rem; padding:0.3rem 0.6rem;">おすすめ再計算</button>
     </form>
     <form method="post" action="/inbox/auto-accept">
-        <button type="submit" class="btn btn-secondary" style="font-size:0.8rem; padding:0.3rem 0.6rem;">自動承認評価</button>
+        <button type="submit" class="btn btn-secondary" style="font-size:0.8rem; padding:0.3rem 0.6rem;">自動承認を評価</button>
     </form>
 </div>
 
@@ -25,16 +29,16 @@
     <h3>
         {{ it.title }}
         {% if it.recommended %}
-        <span class="badge" style="background:#28a745; color:white; font-size:0.7em; margin-left:0.3rem;">推薦</span>
+        <span class="badge" style="background:#28a745; color:white; font-size:0.7em; margin-left:0.3rem;">おすすめ</span>
         {% endif %}
     </h3>
     <p class="meta">
         {{ it.source_id_type }}:{{ it.source_id_value }}
-        | 年: {{ it.year or "?" }}
+        | {{ it.year or "?" }}年
         {% if it.venue %}| {{ it.venue }}{% endif %}
-        | ステータス: <span class="badge">{{ it.status }}</span>
+        | <span class="badge">{{ it.status | status_label }}</span>
         {% if it.recommend_score is not none %}
-        | スコア: {{ "%.2f"|format(it.recommend_score) }}
+        | 関連スコア: {{ "%.2f"|format(it.recommend_score) }}
         {% endif %}
     </p>
     {% if it.recommended and it.reasons_json %}
@@ -53,7 +57,7 @@
             {% if it.auto_tags_json and it.auto_tags_json != '[]' %}
             <input type="hidden" name="apply_tags" value="1">
             {% endif %}
-            <button type="submit" style="font-size:0.8rem; padding:0.3rem 0.6rem;">承認</button>
+            <button type="submit" style="font-size:0.8rem; padding:0.3rem 0.6rem;">承認してライブラリへ追加</button>
         </form>
         <form method="post" action="/inbox/{{ it.id }}/reject">
             <button type="submit" class="btn-secondary" style="font-size:0.8rem; padding:0.3rem 0.6rem;">却下</button>
@@ -71,6 +75,6 @@
 </div>
 {% endfor %}
 {% else %}
-<p class="meta">Inbox アイテムがありません（ステータス: {{ current_status }}）。</p>
+<p class="meta">該当する論文候補はありません（表示: {{ current_status | status_label }}）。</p>
 {% endif %}
 {% endblock %}

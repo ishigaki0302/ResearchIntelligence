@@ -1,7 +1,11 @@
 {% extends "base.html" %}
-{% block title %}Jobs — Research Intelligence{% endblock %}
+{% block title %}ジョブ履歴 — Research Intelligence{% endblock %}
 {% block content %}
-<h1>Jobs</h1>
+<h1>ジョブ履歴</h1>
+<p class="meta" style="margin-bottom:1rem;">
+    バックグラウンドで実行された同期・PDF取得・インデックス再構築などのタスクの実行記録です。
+    失敗したジョブはエラー内容を確認し、原因を修正してから再実行してください。
+</p>
 
 {% if jobs %}
 <table style="width:100%; border-collapse:collapse; font-size:0.9em;">
@@ -9,10 +13,10 @@
         <tr style="border-bottom:2px solid #ddd;">
             <th style="text-align:left; padding:0.5rem;">ID</th>
             <th style="text-align:left; padding:0.5rem;">種別</th>
-            <th style="text-align:left; padding:0.5rem;">ステータス</th>
-            <th style="text-align:left; padding:0.5rem;">開始</th>
-            <th style="text-align:left; padding:0.5rem;">終了</th>
-            <th style="text-align:left; padding:0.5rem;">時間</th>
+            <th style="text-align:left; padding:0.5rem;">状態</th>
+            <th style="text-align:left; padding:0.5rem;">開始日時</th>
+            <th style="text-align:left; padding:0.5rem;">終了日時</th>
+            <th style="text-align:left; padding:0.5rem;">所要時間</th>
             <th style="text-align:left; padding:0.5rem;">概要</th>
         </tr>
     </thead>
@@ -20,23 +24,23 @@
     {% for job in jobs %}
         <tr style="border-bottom:1px solid #eee;">
             <td style="padding:0.5rem;">{{ job.id }}</td>
-            <td style="padding:0.5rem;"><code>{{ job.job_type }}</code></td>
+            <td style="padding:0.5rem;"><code>{{ job.job_type | job_type_label }}</code></td>
             <td style="padding:0.5rem;">
                 {% if job.status == 'done' %}
-                <span class="badge" style="background:#d1fae5; color:#059669;">{{ job.status }}</span>
+                <span class="badge" style="background:#d1fae5; color:#059669;">{{ job.status | status_label }}</span>
                 {% elif job.status == 'failed' %}
-                <span class="badge" style="background:#fecaca; color:#dc2626;">{{ job.status }}</span>
+                <span class="badge" style="background:#fecaca; color:#dc2626;">{{ job.status | status_label }}</span>
                 {% elif job.status == 'running' %}
-                <span class="badge" style="background:#fef08a; color:#854d0e;">{{ job.status }}</span>
+                <span class="badge" style="background:#fef08a; color:#854d0e;">{{ job.status | status_label }}</span>
                 {% else %}
-                <span class="badge">{{ job.status }}</span>
+                <span class="badge">{{ job.status | status_label }}</span>
                 {% endif %}
             </td>
             <td style="padding:0.5rem;">{{ job.started_at or '—' }}</td>
             <td style="padding:0.5rem;">{{ job.finished_at or '—' }}</td>
             <td style="padding:0.5rem;">
                 {% if job.started_at and job.finished_at %}
-                    {{ (job.finished_at - job.started_at).total_seconds()|round(1) }}s
+                    {{ (job.finished_at - job.started_at).total_seconds()|round(1) }}秒
                 {% else %}
                     —
                 {% endif %}
@@ -55,6 +59,6 @@
     </tbody>
 </table>
 {% else %}
-<p class="meta">ジョブの記録がありません。</p>
+<p class="meta">ジョブの実行記録はまだありません。</p>
 {% endif %}
 {% endblock %}

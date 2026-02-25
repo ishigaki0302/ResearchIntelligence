@@ -2,6 +2,10 @@
 {% block title %}Research Intelligence — ホーム{% endblock %}
 {% block content %}
 <h1>Research Intelligence</h1>
+<p class="meta" style="margin-bottom:1rem;">
+    論文・ブログ・スライドを一元管理するローカル文献管理ツールです。
+    BibTeX・PDF・URL からインポートし、全文検索・タグ管理・引用分析・類似論文推薦などができます。
+</p>
 
 <div class="stats">
     <div class="stat-box">
@@ -27,7 +31,7 @@
         {{ item.author_names[:3] | join(', ') }}{% if item.author_names|length > 3 %} et al.{% endif %}
         &middot; {{ item.year or '?' }}
         &middot; {{ item.venue_instance or item.venue or '' }}
-        <span class="badge">{{ item.type }}</span>
+        <span class="badge">{{ item.type | type_label }}</span>
     </div>
 </div>
 {% endfor %}
