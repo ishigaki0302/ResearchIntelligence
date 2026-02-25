@@ -17,10 +17,6 @@
         <div class="stat-label">著者数</div>
     </div>
     <div class="stat-box">
-        <div class="stat-num">{{ total_venues }}</div>
-        <div class="stat-label">会場数</div>
-    </div>
-    <div class="stat-box">
         <div class="stat-num">{{ total_tags }}</div>
         <div class="stat-label">タグ数</div>
     </div>
@@ -46,12 +42,12 @@
     </div>
 </div>
 
-{# ─── Row 2: 上位会場 + タグ分布 ─── #}
+{# ─── Row 2: タグ年別推移 + タグ分布 ─── #}
 <div style="display:grid; grid-template-columns:1fr 1fr; gap:1.5rem; margin-bottom:1.5rem;">
     <div class="card">
-        <h2 style="margin-bottom:1rem;">上位会場 Top {{ venues|length }}</h2>
-        {% if venues %}
-        <canvas id="chartVenues" height="300"></canvas>
+        <h2 style="margin-bottom:1rem;">タグ年別推移（上位 {{ tag_trend.series|length }} タグ）</h2>
+        {% if tag_trend.series %}
+        <canvas id="chartTagTrend" height="260"></canvas>
         {% else %}
         <p class="meta">データがありません。</p>
         {% endif %}
@@ -59,7 +55,7 @@
     <div class="card">
         <h2 style="margin-bottom:1rem;">上位タグ Top {{ tags|length }}</h2>
         {% if tags %}
-        <canvas id="chartTags" height="300"></canvas>
+        <canvas id="chartTags" height="260"></canvas>
         {% else %}
         <p class="meta">データがありません。</p>
         {% endif %}
@@ -189,38 +185,85 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script>
 (function () {
-    const fg = getComputedStyle(document.documentElement).getPropertyValue('--fg').trim() || '#111';
-    const muted = getComputedStyle(document.documentElement).getPropertyValue('--muted').trim() || '#666';
-    const border = getComputedStyle(document.documentElement).getPropertyValue('--border').trim() || '#ddd';
-
-    Chart.defaults.color = muted;
-    Chart.defaults.borderColor = border;
-    Chart.defaults.font.family = 'inherit';
-
-    const BLUE = 'rgba(59,130,246,0.8)';
-    const TEAL = 'rgba(20,184,166,0.8)';
     const PALETTE = [
         'rgba(59,130,246,0.8)', 'rgba(20,184,166,0.8)', 'rgba(245,158,11,0.8)',
         'rgba(239,68,68,0.8)', 'rgba(139,92,246,0.8)', 'rgba(236,72,153,0.8)',
         'rgba(34,197,94,0.8)', 'rgba(251,146,60,0.8)',
     ];
+    const BLUE = PALETTE[0];
+    const TEAL = PALETTE[1];
+
+    Chart.defaults.font.family = 'inherit';
+    Chart.defaults.color = '#6b7280';
+    Chart.defaults.borderColor = '#e0e0e0';
 
     {% if by_year %}
+    new Chart(document.getElementById('chartByYear'), {
+        type: 'bar',
+        data: {
+            labels: {{ by_year | tojson }}.map(d => d.year),
+            datasets: [{
+                label: '件数',
+                data: {{ by_year | tojson }}.map(d => d.count),
+                backgroundColor: BLUE,
+                borderRadius: 3,
+            }]
+        },
+        options: {
+            plugins: { legend: { display: false } },
+            scales: {
+                x: { grid: { display: false } },
+                y: { beginAtZero: true, ticks: { precision: 0 } }
+            }
+        }
+    });
+    {% endif %}
+
+    {% if by_month %}
+    new Chart(document.getElementById('chartByMonth'), {
+        type: 'line',
+        data: {
+            labels: {{ by_month | tojson }}.map(d => d.month),
+            datasets: [{
+                label: '登録数',
+                data: {{ by_month | tojson }}.map(d => d.count),
+                borderColor: TEAL,
+                backgroundColor: 'rgba(20,184,166,0.15)',
+                fill: true,
+                tension: 0.3,
+                pointRadius: {{ by_month | length }} > 24 ? 0 : 3,
+            }]
+        },
+        options: {
+            plugins: { legend: { display: false } },
+            scales: {
+                x: { ticks: { maxTicksLimit: 12, maxRotation: 45 } },
+                y: { beginAtZero: true, ticks: { precision: 0 } }
+            }
+        }
+    });
+    {% endif %}
+
+    {% if tag_trend.series %}
     {
-        const data = {{ by_year | tojson }};
-        new Chart(document.getElementById('chartByYear'), {
-            type: 'bar',
+        const trend = {{ tag_trend | tojson }};
+        new Chart(document.getElementById('chartTagTrend'), {
+            type: 'line',
             data: {
-                labels: data.map(d => d.year),
-                datasets: [{
-                    label: '件数',
-                    data: data.map(d => d.count),
-                    backgroundColor: BLUE,
-                    borderRadius: 3,
-                }]
+                labels: trend.years,
+                datasets: trend.series.map((s, i) => ({
+                    label: s.tag,
+                    data: s.data,
+                    borderColor: PALETTE[i % PALETTE.length],
+                    backgroundColor: 'transparent',
+                    tension: 0.3,
+                    pointRadius: 3,
+                }))
             },
             options: {
-                plugins: { legend: { display: false } },
+                plugins: {
+                    legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } }
+                },
                 scales: {
                     x: { grid: { display: false } },
                     y: { beginAtZero: true, ticks: { precision: 0 } }
@@ -230,89 +273,27 @@
     }
     {% endif %}
 
-    {% if by_month %}
-    {
-        const data = {{ by_month | tojson }};
-        new Chart(document.getElementById('chartByMonth'), {
-            type: 'line',
-            data: {
-                labels: data.map(d => d.month),
-                datasets: [{
-                    label: '登録数',
-                    data: data.map(d => d.count),
-                    borderColor: TEAL,
-                    backgroundColor: 'rgba(20,184,166,0.15)',
-                    fill: true,
-                    tension: 0.3,
-                    pointRadius: data.length > 24 ? 0 : 3,
-                }]
-            },
-            options: {
-                plugins: { legend: { display: false } },
-                scales: {
-                    x: {
-                        ticks: {
-                            maxTicksLimit: 12,
-                            maxRotation: 45,
-                        }
-                    },
-                    y: { beginAtZero: true, ticks: { precision: 0 } }
-                }
-            }
-        });
-    }
-    {% endif %}
-
-    {% if venues %}
-    {
-        const data = {{ venues | tojson }};
-        new Chart(document.getElementById('chartVenues'), {
-            type: 'bar',
-            data: {
-                labels: data.map(d => d.venue),
-                datasets: [{
-                    label: '件数',
-                    data: data.map(d => d.count),
-                    backgroundColor: BLUE,
-                    borderRadius: 3,
-                }]
-            },
-            options: {
-                indexAxis: 'y',
-                plugins: { legend: { display: false } },
-                scales: {
-                    x: { beginAtZero: true, ticks: { precision: 0 } },
-                    y: { grid: { display: false } }
-                }
-            }
-        });
-    }
-    {% endif %}
-
     {% if tags %}
-    {
-        const data = {{ tags | tojson }};
-        new Chart(document.getElementById('chartTags'), {
-            type: 'bar',
-            data: {
-                labels: data.map(d => d.tag),
-                datasets: [{
-                    label: '件数',
-                    data: data.map(d => d.count),
-                    backgroundColor: TEAL,
-                    borderRadius: 3,
-                }]
-            },
-            options: {
-                indexAxis: 'y',
-                plugins: { legend: { display: false } },
-                scales: {
-                    x: { beginAtZero: true, ticks: { precision: 0 } },
-                    y: { grid: { display: false } }
-                }
+    new Chart(document.getElementById('chartTags'), {
+        type: 'bar',
+        data: {
+            labels: {{ tags | tojson }}.map(d => d.tag),
+            datasets: [{
+                label: '件数',
+                data: {{ tags | tojson }}.map(d => d.count),
+                backgroundColor: TEAL,
+                borderRadius: 3,
+            }]
+        },
+        options: {
+            indexAxis: 'y',
+            plugins: { legend: { display: false } },
+            scales: {
+                x: { beginAtZero: true, ticks: { precision: 0 } },
+                y: { grid: { display: false } }
             }
-        });
-    }
+        }
+    });
     {% endif %}
 
     {% if by_type %}
@@ -329,9 +310,7 @@
                 }]
             },
             options: {
-                plugins: {
-                    legend: { position: 'bottom' }
-                }
+                plugins: { legend: { position: 'bottom' } }
             }
         });
     }
