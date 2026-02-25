@@ -22,13 +22,33 @@ from app.core.models import (
     Tag,
 )
 
-_VENUE_NAMES = frozenset({
-    "acl", "emnlp", "naacl", "eacl", "coling", "ijcnlp", "aacl",
-    "iclr", "neurips", "nips", "icml", "aaai", "ijcai",
-})
-_STATUS_NAMES = frozenset({
-    "read", "mine", "starred", "to-read", "important", "unread",
-})
+_VENUE_NAMES = frozenset(
+    {
+        "acl",
+        "emnlp",
+        "naacl",
+        "eacl",
+        "coling",
+        "ijcnlp",
+        "aacl",
+        "iclr",
+        "neurips",
+        "nips",
+        "icml",
+        "aaai",
+        "ijcai",
+    }
+)
+_STATUS_NAMES = frozenset(
+    {
+        "read",
+        "mine",
+        "starred",
+        "to-read",
+        "important",
+        "unread",
+    }
+)
 
 
 def infer_tag_kind(name: str) -> str:
@@ -350,9 +370,7 @@ def list_tag_objects_for_item(session: Session, item_id: int) -> list[Tag]:
     tag_ids = [link.tag_id for link in links]
     if not tag_ids:
         return []
-    return session.execute(
-        select(Tag).where(Tag.id.in_(tag_ids)).order_by(Tag.kind, Tag.name)
-    ).scalars().all()
+    return session.execute(select(Tag).where(Tag.id.in_(tag_ids)).order_by(Tag.kind, Tag.name)).scalars().all()
 
 
 def add_citation(

@@ -187,9 +187,7 @@ def _migration_v6(engine):
         if "tags" in insp.get_table_names():
             existing = [c["name"] for c in insp.get_columns("tags")]
             if "kind" not in existing:
-                conn.execute(text(
-                    "ALTER TABLE tags ADD COLUMN kind VARCHAR(32) NOT NULL DEFAULT 'topic'"
-                ))
+                conn.execute(text("ALTER TABLE tags ADD COLUMN kind VARCHAR(32) NOT NULL DEFAULT 'topic'"))
                 logger.info("Migration v6: added tags.kind column")
         conn.commit()
 
