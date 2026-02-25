@@ -30,7 +30,10 @@
 {% endif %}
 
 {% if recent_items %}
-<h2>最近追加された文献</h2>
+<div style="display:flex; align-items:baseline; justify-content:space-between;">
+    <h2>最近追加された文献</h2>
+    <a href="/papers" style="font-size:0.85rem;">すべて見る →</a>
+</div>
 {% for item in recent_items %}
 <div class="card">
     <h3><a href="/item/{{ item.id }}">{{ item.title }}</a></h3>
