@@ -2,14 +2,13 @@
 
 import json
 from pathlib import Path
-
-from markupsafe import Markup
 from typing import Optional
 
 from fastapi import FastAPI, Form, Query, Request
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from markupsafe import Markup
 from sqlalchemy import func, select
 
 from app.core.config import resolve_path
