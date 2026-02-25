@@ -8,7 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.bibtex import item_to_bibtex_entry
-from app.core.models import Collection, CollectionItem, Item, ItemTag, Tag
+from app.core.models import Item, ItemTag, Tag
 
 logger = logging.getLogger(__name__)
 
@@ -26,20 +26,6 @@ def _build_query(session: Session, filters: dict | None = None) -> list[Item]:
             stmt = stmt.where(Item.venue.ilike(f"%{filters['venue']}%"))
         if filters.get("type"):
             stmt = stmt.where(Item.type == filters["type"])
-        if filters.get("collection"):
-            coll = session.execute(
-                select(Collection).where(Collection.name.ilike(f"%{filters['collection']}%"))
-            ).scalar_one_or_none()
-            if coll:
-                item_ids = [
-                    ci.item_id
-                    for ci in session.execute(select(CollectionItem).where(CollectionItem.collection_id == coll.id))
-                    .scalars()
-                    .all()
-                ]
-                stmt = stmt.where(Item.id.in_(item_ids))
-            else:
-                return []
         if filters.get("tag"):
             tag = session.execute(select(Tag).where(Tag.name == filters["tag"])).scalar_one_or_none()
             if tag:

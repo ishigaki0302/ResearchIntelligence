@@ -1,6 +1,7 @@
 """CLI entry point for the research intelligence (ri) tool."""
 
 import logging
+import re
 from pathlib import Path
 from typing import Optional
 
@@ -44,6 +45,80 @@ app.add_typer(backup_app)
 
 version_app = typer.Typer(name="version", help="Manage paper versions")
 app.add_typer(version_app)
+
+
+def _collection_name_to_tag(name: str) -> str:
+    """Convert a collection name to a tag.
+
+    Examples:
+        "watch:arxiv-daily" -> "watch/arxiv-daily"
+        "ACL 2024 (main)"   -> "acl"
+    """
+    if name.lower().startswith("watch:"):
+        return "watch/" + name[6:]
+    # Extract first token and lowercase (e.g. "ACL 2024 (main)" -> "acl")
+    m = re.match(r"^([A-Za-z]+)", name)
+    return m.group(1).lower() if m else name.lower()
+
+
+@app.command("migrate-collections")
+def migrate_collections(
+    dry_run: bool = typer.Option(True, "--dry-run/--apply", help="Dry-run (default) or apply"),
+):
+    """Migrate collection memberships to tags and drop collection tables."""
+    from sqlalchemy import text
+
+    from app.core.db import get_engine, get_session, init_db
+    from app.core.service import add_tag_to_item
+
+    init_db()
+    engine = get_engine()
+    session = get_session()
+
+    try:
+        # Check if tables still exist
+        with engine.connect() as conn:
+            tables = [
+                row[0]
+                for row in conn.execute(text("SELECT name FROM sqlite_master WHERE type='table'")).fetchall()
+            ]
+
+        if "collections" not in tables:
+            typer.echo("collections table does not exist — nothing to migrate.")
+            return
+
+        # Read collection data via raw SQL
+        with engine.connect() as conn:
+            rows = conn.execute(
+                text(
+                    "SELECT c.name, ci.item_id FROM collection_items ci"
+                    " JOIN collections c ON c.id = ci.collection_id"
+                )
+            ).fetchall()
+
+        if not rows:
+            typer.echo("No collection items found.")
+        else:
+            typer.echo(f"Found {len(rows)} collection item(s) to migrate.")
+            for coll_name, item_id in rows:
+                tag = _collection_name_to_tag(coll_name)
+                if dry_run:
+                    typer.echo(f"  [dry-run] item {item_id}: collection '{coll_name}' -> tag '{tag}'")
+                else:
+                    add_tag_to_item(session, item_id, tag, source="migrate")
+                    typer.echo(f"  Tagged item {item_id} with '{tag}' (from '{coll_name}')")
+
+        if not dry_run:
+            session.commit()
+            with engine.connect() as conn:
+                conn.execute(text("DROP TABLE IF EXISTS collection_items"))
+                conn.execute(text("DROP TABLE IF EXISTS collections"))
+                conn.commit()
+            typer.echo("Dropped collection_items and collections tables.")
+        else:
+            typer.echo("\nRun with --apply to apply changes.")
+    finally:
+        session.close()
 
 
 @tag_app.command("add")
@@ -155,7 +230,7 @@ def import_cmd(
         )
         result = import_acl(**args)
         typer.echo(f"Done: {result['imported']} imported, {result['skipped']} skipped, {result['total']} total")
-        typer.echo(f"Collection: {result['collection']}")
+        typer.echo(f"Tag: {result['event_tag']}")
 
     elif src_type == "bib":
         typer.echo(f"Importing BibTeX: {args['path']}")
@@ -311,7 +386,6 @@ def export_bib(
     venue: Optional[str] = typer.Option(None, "--venue", help="Filter by venue"),
     year: Optional[str] = typer.Option(None, "--year", help="Filter by year or range"),
     tag: Optional[str] = typer.Option(None, "--tag", help="Filter by tag"),
-    collection: Optional[str] = typer.Option(None, "--collection", help="Filter by collection name"),
 ):
     """Export items as a .bib file."""
     from app.core.db import get_session, init_db
@@ -335,8 +409,6 @@ def export_bib(
             filters["year_to"] = int(year)
     if tag:
         filters["tag"] = tag
-    if collection:
-        filters["collection"] = collection
 
     try:
         result = export_bibtex(session, output_path=output, filters=filters if filters else None)
@@ -421,7 +493,6 @@ def build_citations(
 
 @app.command("download-pdf")
 def download_pdf(
-    collection: Optional[str] = typer.Option(None, "--collection", help="Filter by collection name"),
     max_items: Optional[int] = typer.Option(None, "--max", help="Max items to download"),
     workers: int = typer.Option(4, "--workers", help="Parallel workers (currently sequential)"),
     failed_only: bool = typer.Option(False, "--failed-only", help="Retry only previously failed downloads"),
@@ -434,7 +505,7 @@ def download_pdf(
     from sqlalchemy import select
 
     from app.core.db import get_session, init_db
-    from app.core.models import Collection, CollectionItem, Item, Job
+    from app.core.models import Item, Job
     from app.pipelines.downloader import download_pdf_for_item, download_pdfs
 
     init_db()
@@ -501,18 +572,6 @@ def download_pdf(
             # Only items without PDF
             query = query.where(Item.pdf_path.is_(None))
 
-        if collection:
-            coll = session.execute(select(Collection).where(Collection.name == collection)).scalar_one_or_none()
-            if not coll:
-                typer.echo(f"Collection '{collection}' not found", err=True)
-                raise typer.Exit(1)
-            coll_item_ids = (
-                session.execute(select(CollectionItem.item_id).where(CollectionItem.collection_id == coll.id))
-                .scalars()
-                .all()
-            )
-            query = query.where(Item.id.in_(coll_item_ids))
-
         items = session.execute(query).scalars().all()
 
         if max_items:
@@ -537,7 +596,6 @@ def download_pdf(
 
 @app.command()
 def enrich(
-    collection: Optional[str] = typer.Option(None, "--collection", help="Filter by collection name"),
     limit: Optional[int] = typer.Option(None, "--limit", help="Max items to enrich"),
     item_id: Optional[int] = typer.Option(None, "--id", help="Enrich a single item"),
     update_metadata: bool = typer.Option(False, "--update-metadata", help="Update title/year from API"),
@@ -546,7 +604,7 @@ def enrich(
     from sqlalchemy import select
 
     from app.core.db import get_session, init_db
-    from app.core.models import Collection, CollectionItem, Item
+    from app.core.models import Item
     from app.pipelines.enricher import enrich_item, enrich_items
 
     init_db()
@@ -566,20 +624,7 @@ def enrich(
                 typer.echo("No new IDs found.")
             return
 
-        query = select(Item)
-        if collection:
-            coll = session.execute(select(Collection).where(Collection.name == collection)).scalar_one_or_none()
-            if not coll:
-                typer.echo(f"Collection '{collection}' not found", err=True)
-                raise typer.Exit(1)
-            coll_item_ids = (
-                session.execute(select(CollectionItem.item_id).where(CollectionItem.collection_id == coll.id))
-                .scalars()
-                .all()
-            )
-            query = query.where(Item.id.in_(coll_item_ids))
-
-        items = session.execute(query).scalars().all()
+        items = session.execute(select(Item)).scalars().all()
         if limit:
             items = items[:limit]
 
@@ -617,7 +662,7 @@ def stats():
     from sqlalchemy import func, select
 
     from app.core.db import get_session, init_db
-    from app.core.models import Author, Citation, Collection, Item, Note
+    from app.core.models import Author, Citation, Item, Note
 
     init_db()
     session = get_session()
@@ -626,14 +671,12 @@ def stats():
         item_count = session.execute(select(func.count(Item.id))).scalar()
         author_count = session.execute(select(func.count(Author.id))).scalar()
         note_count = session.execute(select(func.count(Note.id))).scalar()
-        coll_count = session.execute(select(func.count(Collection.id))).scalar()
         cite_count = session.execute(select(func.count(Citation.id))).scalar()
 
-        typer.echo(f"Items:       {item_count}")
-        typer.echo(f"Authors:     {author_count}")
-        typer.echo(f"Notes:       {note_count}")
-        typer.echo(f"Collections: {coll_count}")
-        typer.echo(f"Citations:   {cite_count}")
+        typer.echo(f"Items:     {item_count}")
+        typer.echo(f"Authors:   {author_count}")
+        typer.echo(f"Notes:     {note_count}")
+        typer.echo(f"Citations: {cite_count}")
 
         # Breakdown by type
         type_counts = session.execute(select(Item.type, func.count(Item.id)).group_by(Item.type)).all()
@@ -895,11 +938,9 @@ def analytics_export(
     import json
 
     from app.analytics.trends import (
-        items_by_year_collection,
         items_by_year_tag,
         items_by_year_venue,
         top_keyphrases_by_year,
-        watch_collection_growth,
     )
     from app.core.db import get_session, init_db
 
@@ -908,9 +949,7 @@ def analytics_export(
     try:
         data = {
             "items_by_year_venue": items_by_year_venue(session),
-            "items_by_year_collection": items_by_year_collection(session),
             "items_by_year_tag": items_by_year_tag(session),
-            "watch_collection_growth": watch_collection_growth(session),
             "top_keyphrases_by_year": top_keyphrases_by_year(session),
         }
         Path(out).write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")

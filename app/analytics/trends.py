@@ -1,4 +1,4 @@
-"""Trend analytics — aggregation functions for items, collections, and keyphrases."""
+"""Trend analytics — aggregation functions for items and keyphrases."""
 
 import logging
 
@@ -6,8 +6,6 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.models import (
-    Collection,
-    CollectionItem,
     Item,
     ItemTag,
     Tag,
@@ -30,22 +28,6 @@ def items_by_year_venue(session: Session) -> list[dict]:
     return [{"year": r[0], "venue": r[1], "count": r[2]} for r in rows]
 
 
-def items_by_year_collection(session: Session) -> list[dict]:
-    """Aggregate item counts by year and collection.
-
-    Returns: [{"year": int, "collection": str, "count": int}, ...]
-    """
-    rows = session.execute(
-        select(Item.year, Collection.name, func.count(Item.id))
-        .join(CollectionItem, CollectionItem.item_id == Item.id)
-        .join(Collection, Collection.id == CollectionItem.collection_id)
-        .where(Item.year.is_not(None))
-        .group_by(Item.year, Collection.name)
-        .order_by(Item.year, Collection.name)
-    ).all()
-    return [{"year": r[0], "collection": r[1], "count": r[2]} for r in rows]
-
-
 def items_by_year_tag(session: Session) -> list[dict]:
     """Aggregate item counts by year and tag.
 
@@ -60,43 +42,6 @@ def items_by_year_tag(session: Session) -> list[dict]:
         .order_by(Item.year, Tag.name)
     ).all()
     return [{"year": r[0], "tag": r[1], "count": r[2]} for r in rows]
-
-
-def watch_collection_growth(session: Session) -> list[dict]:
-    """Get cumulative growth of watch:* collections over time.
-
-    Returns: [{"collection": str, "date": str, "cumulative_count": int}, ...]
-    """
-    # Get watch collections
-    watch_colls = session.execute(select(Collection).where(Collection.name.like("watch:%"))).scalars().all()
-
-    results = []
-    for coll in watch_colls:
-        # Get items with their created_at dates
-        rows = (
-            session.execute(
-                select(Item.created_at)
-                .join(CollectionItem, CollectionItem.item_id == Item.id)
-                .where(CollectionItem.collection_id == coll.id)
-                .order_by(Item.created_at)
-            )
-            .scalars()
-            .all()
-        )
-
-        cumulative = 0
-        for dt in rows:
-            cumulative += 1
-            date_str = dt.strftime("%Y-%m-%d") if dt else "unknown"
-            results.append(
-                {
-                    "collection": coll.name,
-                    "date": date_str,
-                    "cumulative_count": cumulative,
-                }
-            )
-
-    return results
 
 
 def top_keyphrases_by_year(session: Session, top_n: int = 20) -> list[dict]:

@@ -6,7 +6,6 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.models import (
-    CollectionItem,
     Item,
     ItemId,
     ItemTag,
@@ -112,7 +111,7 @@ def detect_duplicates(session: Session) -> list[dict]:
 def merge_items(session: Session, src_id: int, dst_id: int, dry_run: bool = True) -> dict:
     """Merge src item into dst item.
 
-    Transfers tags, collections, notes, citations, external_ids from src to dst.
+    Transfers tags, notes, citations, external_ids from src to dst.
     Sets src.status='merged', src.merged_into_id=dst_id.
     Returns counts of moved entities.
     """
@@ -123,7 +122,6 @@ def merge_items(session: Session, src_id: int, dst_id: int, dry_run: bool = True
 
     counts = {
         "tags": 0,
-        "collections": 0,
         "notes": 0,
         "citations_out": 0,
         "citations_in": 0,
@@ -133,7 +131,6 @@ def merge_items(session: Session, src_id: int, dst_id: int, dry_run: bool = True
     if dry_run:
         # Count what would be moved
         counts["tags"] = len(src.tag_links)
-        counts["collections"] = len(src.collection_links)
         counts["notes"] = len(src.notes)
         counts["citations_out"] = len(src.citations_out)
         counts["citations_in"] = len(src.citations_in)
@@ -146,13 +143,6 @@ def merge_items(session: Session, src_id: int, dst_id: int, dry_run: bool = True
         if tl.tag_id not in existing_tag_ids:
             session.add(ItemTag(item_id=dst_id, tag_id=tl.tag_id, source=tl.source))
             counts["tags"] += 1
-
-    # Transfer collections (skip duplicates)
-    existing_coll_ids = {cl.collection_id for cl in dst.collection_links}
-    for cl in list(src.collection_links):
-        if cl.collection_id not in existing_coll_ids:
-            session.add(CollectionItem(collection_id=cl.collection_id, item_id=dst_id))
-            counts["collections"] += 1
 
     # Transfer external IDs (skip duplicates)
     existing_ext = {(eid.id_type, eid.id_value) for eid in dst.external_ids}

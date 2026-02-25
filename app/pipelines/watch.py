@@ -10,7 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.models import InboxItem, Item, ItemId, Watch
-from app.core.service import add_item_to_collection, get_or_create_collection, upsert_item
+from app.core.service import add_tag_to_item, upsert_item
 
 logger = logging.getLogger(__name__)
 
@@ -148,7 +148,7 @@ def run_watch(session: Session, watch: Watch, since_days: int = 14, limit: int =
 
 
 def accept_inbox_item(session: Session, inbox_item: InboxItem) -> Item:
-    """Accept an inbox item: create/update item in main DB, assign to watch collection."""
+    """Accept an inbox item: create/update item in main DB, tag with watch name."""
     authors = json.loads(inbox_item.authors_json) if inbox_item.authors_json else []
 
     ext_ids = {}
@@ -169,11 +169,7 @@ def accept_inbox_item(session: Session, inbox_item: InboxItem) -> Item:
     inbox_item.status = "accepted"
     inbox_item.accepted_item_id = item.id
 
-    # Add to watch collection
-    watch = inbox_item.watch
-    coll_name = f"watch:{watch.name}"
-    coll = get_or_create_collection(session, coll_name)
-    add_item_to_collection(session, item, coll)
+    add_tag_to_item(session, item.id, "watch/" + inbox_item.watch.name, source="watch")
 
     session.flush()
     return item

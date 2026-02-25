@@ -169,8 +169,10 @@ class TestInboxAccept:
         assert inbox_item.accepted_item_id == item.id
         assert item.title == "Test Paper for Accept"
 
-        # Check collection
-        assert any(cl.collection.name == "watch:accept-test" for cl in item.collection_links)
+        # Check tag
+        from app.core.service import list_tags_for_item
+
+        assert "watch/accept-test" in list_tags_for_item(session, item.id)
 
     def test_inbox_accept_idempotent(self, tmp_db):
         """Accepting an item that already exists in items table should not create duplicate."""

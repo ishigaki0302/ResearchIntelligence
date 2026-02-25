@@ -1,15 +1,12 @@
 """Tests for trend analytics."""
 
 from app.analytics.trends import (
-    items_by_year_collection,
     items_by_year_tag,
     items_by_year_venue,
     top_keyphrases_by_year,
 )
 from app.core.service import (
-    add_item_to_collection,
     add_tag_to_item,
-    get_or_create_collection,
     upsert_item,
 )
 
@@ -77,24 +74,16 @@ class TestAnalyticsExport:
         session.commit()
 
         add_tag_to_item(session, item2.id, "method/RAG")
-        coll = get_or_create_collection(session, "test-coll")
-        add_item_to_collection(session, item2, coll)
         session.commit()
 
         yv = items_by_year_venue(session)
-        yc = items_by_year_collection(session)
         yt = items_by_year_tag(session)
 
         assert isinstance(yv, list)
-        assert isinstance(yc, list)
         assert isinstance(yt, list)
 
         # year_venue should have 2 entries (ACL 2024, EMNLP 2024)
         assert len(yv) == 2
-
-        # year_collection should have 1 entry
-        assert len(yc) == 1
-        assert yc[0]["collection"] == "test-coll"
 
         # year_tag should have 1 entry
         assert len(yt) == 1

@@ -3,7 +3,6 @@
 Handles CRUD, idempotent upsert, note generation, and author management.
 """
 
-import json
 import shutil
 from pathlib import Path
 
@@ -15,8 +14,6 @@ from app.core.config import get_config, resolve_path
 from app.core.models import (
     Author,
     Citation,
-    Collection,
-    CollectionItem,
     Item,
     ItemAuthor,
     ItemId,
@@ -282,28 +279,6 @@ def ensure_note(session: Session, item: Item) -> Note:
     session.add(note)
     session.flush()
     return note
-
-
-def get_or_create_collection(session: Session, name: str, spec: dict | None = None) -> Collection:
-    """Find or create a collection by name."""
-    coll = session.execute(select(Collection).where(Collection.name == name)).scalar_one_or_none()
-    if coll is None:
-        coll = Collection(name=name, spec_json=json.dumps(spec) if spec else None)
-        session.add(coll)
-        session.flush()
-    return coll
-
-
-def add_item_to_collection(session: Session, item: Item, collection: Collection):
-    """Add item to collection if not already there."""
-    exists = session.execute(
-        select(CollectionItem).where(
-            CollectionItem.collection_id == collection.id,
-            CollectionItem.item_id == item.id,
-        )
-    ).scalar_one_or_none()
-    if not exists:
-        session.add(CollectionItem(collection_id=collection.id, item_id=item.id))
 
 
 def add_tag_to_item(session: Session, item_id: int, tag_name: str, source: str = "manual") -> ItemTag:

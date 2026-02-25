@@ -60,7 +60,6 @@ class Item(Base):
     )
     tag_links = relationship("ItemTag", back_populates="item", cascade="all, delete-orphan")
     notes = relationship("Note", back_populates="item", cascade="all, delete-orphan")
-    collection_links = relationship("CollectionItem", back_populates="item", cascade="all, delete-orphan")
     citations_out = relationship(
         "Citation", foreign_keys="Citation.src_item_id", back_populates="src_item", cascade="all, delete-orphan"
     )
@@ -151,30 +150,6 @@ class Note(Base):
     updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
 
     item = relationship("Item", back_populates="notes")
-
-
-class Collection(Base):
-    __tablename__ = "collections"
-
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    name = Column(String(256), nullable=False, unique=True)
-    spec_json = Column(Text)
-    created_at = Column(DateTime, default=_utcnow)
-
-    item_links = relationship("CollectionItem", back_populates="collection", cascade="all, delete-orphan")
-
-
-class CollectionItem(Base):
-    __tablename__ = "collection_items"
-
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    collection_id = Column(Integer, ForeignKey("collections.id", ondelete="CASCADE"), nullable=False)
-    item_id = Column(Integer, ForeignKey("items.id", ondelete="CASCADE"), nullable=False)
-
-    collection = relationship("Collection", back_populates="item_links")
-    item = relationship("Item", back_populates="collection_links")
-
-    __table_args__ = (UniqueConstraint("collection_id", "item_id", name="uq_collection_items"),)
 
 
 class Citation(Base):
