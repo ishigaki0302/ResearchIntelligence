@@ -2,146 +2,340 @@
 {% block title %}分析 — Research Intelligence{% endblock %}
 {% block content %}
 <h1>分析</h1>
-<p class="meta" style="margin-bottom:1rem;">
-    ライブラリに登録した文献の傾向を可視化します。会場別・タグ別の年次分布、頻出キーフレーズ、
-    引用ネットワーク分析（被引用数・PageRank）、トピッククラスタリングなどを確認できます。
+<p class="meta" style="margin-bottom:1.5rem;">
+    ライブラリに登録した文献の統計・傾向を可視化します。
 </p>
 
-<h2>クラスタ概要</h2>
-{% if cluster_data and cluster_data.clusters %}
-<p class="meta">{{ cluster_data.total_items }} 件を {{ cluster_data.n_clusters }} クラスタに分類</p>
-{% for c in cluster_data.clusters %}
-<div class="card" style="margin-bottom:1rem;">
-    <h3>クラスタ {{ c.id }}（{{ c.size }} 件）</h3>
-    <p><strong>トピック:</strong>
-    {% for t in c.top_terms[:5] %}
-        <span class="badge" style="margin:0.15rem;">{{ t }}</span>
-    {% endfor %}
-    </p>
-    <p><strong>代表的な論文:</strong></p>
-    <ul>
-    {% for item in c.representative_items[:3] %}
-        <li><a href="/item/{{ item.id }}">{{ item.title }}</a>
-            {% if item.year %}<span class="meta">[{{ item.year }}]</span>{% endif %}
-            {% if item.venue %}<span class="meta">({{ item.venue }})</span>{% endif %}
-        </li>
-    {% endfor %}
-    </ul>
+{# ─── Summary stats ─── #}
+<div class="stats" style="margin-bottom:2rem;">
+    <div class="stat-box">
+        <div class="stat-num">{{ total_items }}</div>
+        <div class="stat-label">文献数</div>
+    </div>
+    <div class="stat-box">
+        <div class="stat-num">{{ total_authors }}</div>
+        <div class="stat-label">著者数</div>
+    </div>
+    <div class="stat-box">
+        <div class="stat-num">{{ total_venues }}</div>
+        <div class="stat-label">会場数</div>
+    </div>
+    <div class="stat-box">
+        <div class="stat-num">{{ total_tags }}</div>
+        <div class="stat-label">タグ数</div>
+    </div>
 </div>
-{% endfor %}
-{% else %}
-<p class="meta">クラスタリングに十分なデータがありません。</p>
-{% endif %}
 
-<h2>影響力のある論文（引用ネットワーク）</h2>
+{# ─── Row 1: 出版年分布 + 登録推移 ─── #}
+<div style="display:grid; grid-template-columns:1fr 1fr; gap:1.5rem; margin-bottom:1.5rem;">
+    <div class="card">
+        <h2 style="margin-bottom:1rem;">出版年分布</h2>
+        {% if by_year %}
+        <canvas id="chartByYear" height="220"></canvas>
+        {% else %}
+        <p class="meta">データがありません。</p>
+        {% endif %}
+    </div>
+    <div class="card">
+        <h2 style="margin-bottom:1rem;">登録推移（月別）</h2>
+        {% if by_month %}
+        <canvas id="chartByMonth" height="220"></canvas>
+        {% else %}
+        <p class="meta">データがありません。</p>
+        {% endif %}
+    </div>
+</div>
+
+{# ─── Row 2: 上位会場 + タグ分布 ─── #}
+<div style="display:grid; grid-template-columns:1fr 1fr; gap:1.5rem; margin-bottom:1.5rem;">
+    <div class="card">
+        <h2 style="margin-bottom:1rem;">上位会場 Top {{ venues|length }}</h2>
+        {% if venues %}
+        <canvas id="chartVenues" height="300"></canvas>
+        {% else %}
+        <p class="meta">データがありません。</p>
+        {% endif %}
+    </div>
+    <div class="card">
+        <h2 style="margin-bottom:1rem;">上位タグ Top {{ tags|length }}</h2>
+        {% if tags %}
+        <canvas id="chartTags" height="300"></canvas>
+        {% else %}
+        <p class="meta">データがありません。</p>
+        {% endif %}
+    </div>
+</div>
+
+{# ─── Row 3: 種別内訳 + 著者ランキング ─── #}
+<div style="display:grid; grid-template-columns:1fr 2fr; gap:1.5rem; margin-bottom:1.5rem;">
+    <div class="card">
+        <h2 style="margin-bottom:1rem;">種別内訳</h2>
+        {% if by_type %}
+        <canvas id="chartType" height="220"></canvas>
+        {% else %}
+        <p class="meta">データがありません。</p>
+        {% endif %}
+    </div>
+    <div class="card">
+        <h2 style="margin-bottom:1rem;">著者ランキング Top {{ authors|length }}</h2>
+        {% if authors %}
+        <table style="width:100%; border-collapse:collapse; font-size:0.9rem;">
+            <thead>
+                <tr style="border-bottom:1px solid var(--border);">
+                    <th style="text-align:right; padding:0.3rem 0.5rem; width:2.5rem; color:var(--muted);">#</th>
+                    <th style="text-align:left; padding:0.3rem 0.5rem;">著者</th>
+                    <th style="text-align:right; padding:0.3rem 0.5rem; width:4rem;">件数</th>
+                    <th style="padding:0.3rem 0.5rem;"></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% set max_count = authors[0].count if authors else 1 %}
+                {% for a in authors %}
+                <tr style="border-bottom:1px solid var(--border);">
+                    <td style="text-align:right; padding:0.35rem 0.5rem; color:var(--muted);">{{ loop.index }}</td>
+                    <td style="padding:0.35rem 0.5rem;">{{ a.author }}</td>
+                    <td style="text-align:right; padding:0.35rem 0.5rem; font-variant-numeric:tabular-nums;">{{ a.count }}</td>
+                    <td style="padding:0.35rem 0.5rem; width:40%;">
+                        <div style="background:var(--border); border-radius:2px; height:6px;">
+                            <div style="background:var(--fg); border-radius:2px; height:6px; width:{{ (a.count / max_count * 100)|int }}%;"></div>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p class="meta">データがありません。</p>
+        {% endif %}
+    </div>
+</div>
+
+{# ─── Citation network ─── #}
 {% if network_data and network_data.node_count > 0 %}
-<p class="meta">{{ network_data.node_count }} ノード、{{ network_data.edge_count }} エッジ</p>
-
-<h3>被引用数ランキング</h3>
-<table class="card" style="width:100%; border-collapse:collapse;">
-    <tr style="border-bottom:1px solid var(--border);">
-        <th style="text-align:left; padding:0.5rem;">論文</th>
-        <th style="text-align:right; padding:0.5rem;">被引用数</th>
-    </tr>
-    {% for item in network_data.top_in_degree[:10] %}
-    <tr style="border-bottom:1px solid var(--border);">
-        <td style="padding:0.5rem;"><a href="/item/{{ item.id }}">{{ item.title[:80] }}</a>
-            {% if item.year %}<span class="meta">[{{ item.year }}]</span>{% endif %}
-        </td>
-        <td style="text-align:right; padding:0.5rem;">{{ item.in_degree }}</td>
-    </tr>
-    {% endfor %}
-</table>
-
-{% if network_data.top_pagerank %}
-<h3>PageRank ランキング</h3>
-<table class="card" style="width:100%; border-collapse:collapse;">
-    <tr style="border-bottom:1px solid var(--border);">
-        <th style="text-align:left; padding:0.5rem;">論文</th>
-        <th style="text-align:right; padding:0.5rem;">PageRank</th>
-    </tr>
-    {% for item in network_data.top_pagerank[:10] %}
-    <tr style="border-bottom:1px solid var(--border);">
-        <td style="padding:0.5rem;"><a href="/item/{{ item.id }}">{{ item.title[:80] }}</a></td>
-        <td style="text-align:right; padding:0.5rem;">{{ "%.4f"|format(item.pagerank) }}</td>
-    </tr>
-    {% endfor %}
-</table>
-{% endif %}
-
-{% if network_data.communities %}
-<h3>コミュニティ（{{ network_data.community_count }} 件検出）</h3>
-{% for comm in network_data.communities[:5] %}
-<div class="card" style="margin-bottom:0.5rem;">
-    <strong>コミュニティ {{ comm.id }}</strong>（{{ comm.size }} 件）
-    <ul>
-    {% for m in comm.top_members[:3] %}
-        <li><a href="/item/{{ m.id }}">{{ m.title[:70] }}</a> <span class="meta">（被引用: {{ m.in_degree }}）</span></li>
-    {% endfor %}
-    </ul>
+<div class="card" style="margin-bottom:1.5rem;">
+    <h2 style="margin-bottom:1rem;">引用ネットワーク <span class="meta" style="font-size:0.85rem; font-weight:normal;">{{ network_data.node_count }} ノード / {{ network_data.edge_count }} エッジ</span></h2>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:1.5rem;">
+        <div>
+            <h3 style="margin-bottom:0.5rem;">被引用数ランキング</h3>
+            <table style="width:100%; border-collapse:collapse; font-size:0.9rem;">
+                <thead>
+                    <tr style="border-bottom:1px solid var(--border);">
+                        <th style="text-align:left; padding:0.3rem 0.5rem;">論文</th>
+                        <th style="text-align:right; padding:0.3rem 0.5rem;">被引用</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in network_data.top_in_degree[:10] %}
+                    <tr style="border-bottom:1px solid var(--border);">
+                        <td style="padding:0.35rem 0.5rem;"><a href="/item/{{ item.id }}">{{ item.title[:60] }}{% if item.title|length > 60 %}…{% endif %}</a>
+                            {% if item.year %}<span class="meta"> [{{ item.year }}]</span>{% endif %}
+                        </td>
+                        <td style="text-align:right; padding:0.35rem 0.5rem;">{{ item.in_degree }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% if network_data.top_pagerank %}
+        <div>
+            <h3 style="margin-bottom:0.5rem;">PageRank ランキング</h3>
+            <table style="width:100%; border-collapse:collapse; font-size:0.9rem;">
+                <thead>
+                    <tr style="border-bottom:1px solid var(--border);">
+                        <th style="text-align:left; padding:0.3rem 0.5rem;">論文</th>
+                        <th style="text-align:right; padding:0.3rem 0.5rem;">スコア</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in network_data.top_pagerank[:10] %}
+                    <tr style="border-bottom:1px solid var(--border);">
+                        <td style="padding:0.35rem 0.5rem;"><a href="/item/{{ item.id }}">{{ item.title[:60] }}{% if item.title|length > 60 %}…{% endif %}</a></td>
+                        <td style="text-align:right; padding:0.35rem 0.5rem;">{{ "%.4f"|format(item.pagerank) }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+    </div>
 </div>
-{% endfor %}
 {% endif %}
 
-{% else %}
-<p class="meta">引用データがありません。</p>
+{# ─── Clustering ─── #}
+{% if cluster_data and cluster_data.clusters %}
+<div class="card" style="margin-bottom:1.5rem;">
+    <h2 style="margin-bottom:1rem;">トピッククラスタ <span class="meta" style="font-size:0.85rem; font-weight:normal;">{{ cluster_data.total_items }} 件 / {{ cluster_data.n_clusters }} クラスタ</span></h2>
+    <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(280px, 1fr)); gap:1rem;">
+        {% for c in cluster_data.clusters %}
+        <div style="border:1px solid var(--border); border-radius:6px; padding:1rem;">
+            <h3 style="margin-bottom:0.5rem; font-size:0.95rem;">クラスタ {{ c.id }} <span class="meta">（{{ c.size }} 件）</span></h3>
+            <div style="margin-bottom:0.5rem;">
+                {% for t in c.top_terms[:5] %}
+                <span class="badge" style="margin:0.1rem;">{{ t }}</span>
+                {% endfor %}
+            </div>
+            <ul style="margin:0; padding-left:1.2rem; font-size:0.85rem; color:var(--muted);">
+                {% for item in c.representative_items[:3] %}
+                <li><a href="/item/{{ item.id }}">{{ item.title[:50] }}{% if item.title|length > 50 %}…{% endif %}</a></li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endfor %}
+    </div>
+</div>
 {% endif %}
 
-<h2>年 × 会場</h2>
-{% if data.year_venue %}
-<table class="card" style="width:100%; border-collapse:collapse;">
-    <tr style="border-bottom:1px solid var(--border);">
-        <th style="text-align:left; padding:0.5rem;">年</th>
-        <th style="text-align:left; padding:0.5rem;">会場</th>
-        <th style="text-align:right; padding:0.5rem;">件数</th>
-    </tr>
-    {% for row in data.year_venue %}
-    <tr style="border-bottom:1px solid var(--border);">
-        <td style="padding:0.5rem;">{{ row.year }}</td>
-        <td style="padding:0.5rem;">{{ row.venue }}</td>
-        <td style="text-align:right; padding:0.5rem;">{{ row.count }}</td>
-    </tr>
-    {% endfor %}
-</table>
-{% else %}
-<p class="meta">データがありません。</p>
-{% endif %}
+{# ─── Chart.js scripts ─── #}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+(function () {
+    const fg = getComputedStyle(document.documentElement).getPropertyValue('--fg').trim() || '#111';
+    const muted = getComputedStyle(document.documentElement).getPropertyValue('--muted').trim() || '#666';
+    const border = getComputedStyle(document.documentElement).getPropertyValue('--border').trim() || '#ddd';
 
-<h2>年 × タグ</h2>
-{% if data.year_tag %}
-<table class="card" style="width:100%; border-collapse:collapse;">
-    <tr style="border-bottom:1px solid var(--border);">
-        <th style="text-align:left; padding:0.5rem;">年</th>
-        <th style="text-align:left; padding:0.5rem;">タグ</th>
-        <th style="text-align:right; padding:0.5rem;">件数</th>
-    </tr>
-    {% for row in data.year_tag %}
-    <tr style="border-bottom:1px solid var(--border);">
-        <td style="padding:0.5rem;">{{ row.year }}</td>
-        <td style="padding:0.5rem;">{{ row.tag }}</td>
-        <td style="text-align:right; padding:0.5rem;">{{ row.count }}</td>
-    </tr>
-    {% endfor %}
-</table>
-{% else %}
-<p class="meta">データがありません。</p>
-{% endif %}
+    Chart.defaults.color = muted;
+    Chart.defaults.borderColor = border;
+    Chart.defaults.font.family = 'inherit';
 
-<h2>年別キーフレーズ</h2>
-{% if data.keyphrases %}
-{% set ns = namespace(current_year=0) %}
-{% for row in data.keyphrases %}
-    {% if row.year != ns.current_year %}
-        {% if ns.current_year != 0 %}</div>{% endif %}
-        {% set ns.current_year = row.year %}
-        <h3>{{ row.year }}</h3>
-        <div class="card">
+    const BLUE = 'rgba(59,130,246,0.8)';
+    const TEAL = 'rgba(20,184,166,0.8)';
+    const PALETTE = [
+        'rgba(59,130,246,0.8)', 'rgba(20,184,166,0.8)', 'rgba(245,158,11,0.8)',
+        'rgba(239,68,68,0.8)', 'rgba(139,92,246,0.8)', 'rgba(236,72,153,0.8)',
+        'rgba(34,197,94,0.8)', 'rgba(251,146,60,0.8)',
+    ];
+
+    {% if by_year %}
+    {
+        const data = {{ by_year | tojson }};
+        new Chart(document.getElementById('chartByYear'), {
+            type: 'bar',
+            data: {
+                labels: data.map(d => d.year),
+                datasets: [{
+                    label: '件数',
+                    data: data.map(d => d.count),
+                    backgroundColor: BLUE,
+                    borderRadius: 3,
+                }]
+            },
+            options: {
+                plugins: { legend: { display: false } },
+                scales: {
+                    x: { grid: { display: false } },
+                    y: { beginAtZero: true, ticks: { precision: 0 } }
+                }
+            }
+        });
+    }
     {% endif %}
-    <span class="badge" style="margin:0.15rem;">{{ row.phrase }} ({{ row.score }})</span>
-{% endfor %}
-{% if data.keyphrases %}</div>{% endif %}
-{% else %}
-<p class="meta">キーフレーズ抽出に十分なデータがありません（年あたり2件以上必要）。</p>
-{% endif %}
 
+    {% if by_month %}
+    {
+        const data = {{ by_month | tojson }};
+        new Chart(document.getElementById('chartByMonth'), {
+            type: 'line',
+            data: {
+                labels: data.map(d => d.month),
+                datasets: [{
+                    label: '登録数',
+                    data: data.map(d => d.count),
+                    borderColor: TEAL,
+                    backgroundColor: 'rgba(20,184,166,0.15)',
+                    fill: true,
+                    tension: 0.3,
+                    pointRadius: data.length > 24 ? 0 : 3,
+                }]
+            },
+            options: {
+                plugins: { legend: { display: false } },
+                scales: {
+                    x: {
+                        ticks: {
+                            maxTicksLimit: 12,
+                            maxRotation: 45,
+                        }
+                    },
+                    y: { beginAtZero: true, ticks: { precision: 0 } }
+                }
+            }
+        });
+    }
+    {% endif %}
+
+    {% if venues %}
+    {
+        const data = {{ venues | tojson }};
+        new Chart(document.getElementById('chartVenues'), {
+            type: 'bar',
+            data: {
+                labels: data.map(d => d.venue),
+                datasets: [{
+                    label: '件数',
+                    data: data.map(d => d.count),
+                    backgroundColor: BLUE,
+                    borderRadius: 3,
+                }]
+            },
+            options: {
+                indexAxis: 'y',
+                plugins: { legend: { display: false } },
+                scales: {
+                    x: { beginAtZero: true, ticks: { precision: 0 } },
+                    y: { grid: { display: false } }
+                }
+            }
+        });
+    }
+    {% endif %}
+
+    {% if tags %}
+    {
+        const data = {{ tags | tojson }};
+        new Chart(document.getElementById('chartTags'), {
+            type: 'bar',
+            data: {
+                labels: data.map(d => d.tag),
+                datasets: [{
+                    label: '件数',
+                    data: data.map(d => d.count),
+                    backgroundColor: TEAL,
+                    borderRadius: 3,
+                }]
+            },
+            options: {
+                indexAxis: 'y',
+                plugins: { legend: { display: false } },
+                scales: {
+                    x: { beginAtZero: true, ticks: { precision: 0 } },
+                    y: { grid: { display: false } }
+                }
+            }
+        });
+    }
+    {% endif %}
+
+    {% if by_type %}
+    {
+        const TYPE_LABELS = { paper: '論文', blog: 'ブログ', slide: 'スライド', note: 'ノート' };
+        const data = {{ by_type | tojson }};
+        new Chart(document.getElementById('chartType'), {
+            type: 'doughnut',
+            data: {
+                labels: data.map(d => TYPE_LABELS[d.type] || d.type),
+                datasets: [{
+                    data: data.map(d => d.count),
+                    backgroundColor: PALETTE.slice(0, data.length),
+                }]
+            },
+            options: {
+                plugins: {
+                    legend: { position: 'bottom' }
+                }
+            }
+        });
+    }
+    {% endif %}
+})();
+</script>
 {% endblock %}

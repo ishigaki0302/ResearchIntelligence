@@ -12,7 +12,7 @@ from sqlalchemy import func, select
 
 from app.core.config import resolve_path
 from app.core.db import get_session, init_db
-from app.core.models import Citation, InboxItem, Item, ItemId, Job, Note, Tag, ViewHistory, Watch
+from app.core.models import Author, Citation, InboxItem, Item, ItemAuthor, ItemId, Job, Note, Tag, ViewHistory, Watch
 from app.core.service import add_tag_to_item, list_tags_for_item, remove_tag_from_item
 from app.graph.citations import get_citation_subgraph
 from app.indexing.engine import hybrid_search
@@ -65,7 +65,13 @@ def _job_type_label(value: str) -> str:
     return _JOB_TYPE_LABELS.get(value, value)
 
 
+def _tojson(value) -> str:
+    """Jinja2 filter: serialize value to JSON string (safe for inline JS)."""
+    return json.dumps(value, ensure_ascii=False)
+
+
 templates.env.filters["fromjson"] = _fromjson
+templates.env.filters["tojson"] = _tojson
 templates.env.filters["type_label"] = _type_label
 templates.env.filters["status_label"] = _status_label
 templates.env.filters["job_type_label"] = _job_type_label
@@ -781,18 +787,35 @@ def history_page(request: Request):
 @app.get("/analytics", response_class=HTMLResponse)
 def analytics_page(request: Request):
     from app.analytics.trends import (
-        items_by_year_tag,
-        items_by_year_venue,
-        top_keyphrases_by_year,
+        items_added_by_month,
+        items_by_type,
+        items_by_year,
+        top_authors,
+        top_tags,
+        top_venues,
     )
 
     session = get_session()
     try:
-        data = {
-            "year_venue": items_by_year_venue(session),
-            "year_tag": items_by_year_tag(session),
-            "keyphrases": top_keyphrases_by_year(session, top_n=15),
-        }
+        by_year = items_by_year(session)
+        by_month = items_added_by_month(session)
+        venues = top_venues(session, n=15)
+        tags = top_tags(session, n=20)
+        authors = top_authors(session, n=20)
+        by_type = items_by_type(session)
+
+        # Summary stats
+        total_items = session.execute(select(func.count(Item.id)).where(Item.status == "active")).scalar()
+        total_tags = session.execute(select(func.count(Tag.id))).scalar()
+        total_authors = session.execute(
+            select(func.count(Author.id))
+            .join(ItemAuthor, ItemAuthor.author_id == Author.id)
+            .join(Item, Item.id == ItemAuthor.item_id)
+            .where(Item.status == "active")
+        ).scalar()
+        total_venues = session.execute(
+            select(func.count(func.distinct(Item.venue))).where(Item.venue.is_not(None), Item.status == "active")
+        ).scalar()
 
         # Clustering (catch errors gracefully)
         cluster_data = None
@@ -816,7 +839,16 @@ def analytics_page(request: Request):
             "analytics.html",
             {
                 "request": request,
-                "data": data,
+                "total_items": total_items,
+                "total_tags": total_tags,
+                "total_authors": total_authors,
+                "total_venues": total_venues,
+                "by_year": by_year,
+                "by_month": by_month,
+                "venues": venues,
+                "tags": tags,
+                "authors": authors,
+                "by_type": by_type,
                 "cluster_data": cluster_data,
                 "network_data": network_data,
             },
