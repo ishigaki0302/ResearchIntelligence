@@ -2,6 +2,8 @@
 
 import json
 from pathlib import Path
+
+from markupsafe import Markup
 from typing import Optional
 
 from fastapi import FastAPI, Form, Query, Request
@@ -65,9 +67,9 @@ def _job_type_label(value: str) -> str:
     return _JOB_TYPE_LABELS.get(value, value)
 
 
-def _tojson(value) -> str:
-    """Jinja2 filter: serialize value to JSON string (safe for inline JS)."""
-    return json.dumps(value, ensure_ascii=False)
+def _tojson(value) -> Markup:
+    """Jinja2 filter: serialize value to JSON string safe for inline JS."""
+    return Markup(json.dumps(value, ensure_ascii=False))
 
 
 templates.env.filters["fromjson"] = _fromjson
@@ -790,19 +792,31 @@ def analytics_page(request: Request):
         items_added_by_month,
         items_by_type,
         items_by_year,
+        items_by_year_tag,
         top_authors,
         top_tags,
-        top_venues,
     )
 
     session = get_session()
     try:
         by_year = items_by_year(session)
         by_month = items_added_by_month(session)
-        venues = top_venues(session, n=15)
         tags = top_tags(session, n=20)
         authors = top_authors(session, n=20)
         by_type = items_by_type(session)
+
+        # Tag trend: top 6 tags over years
+        top6_tag_names = [t["tag"] for t in top_tags(session, n=6)]
+        year_tag_raw = items_by_year_tag(session)
+        tag_year_counts: dict[str, dict[int, int]] = {t: {} for t in top6_tag_names}
+        for row in year_tag_raw:
+            if row["tag"] in tag_year_counts:
+                tag_year_counts[row["tag"]][row["year"]] = row["count"]
+        trend_years = sorted({row["year"] for row in year_tag_raw})
+        tag_trend = {
+            "years": trend_years,
+            "series": [{"tag": t, "data": [tag_year_counts[t].get(y, 0) for y in trend_years]} for t in top6_tag_names],
+        }
 
         # Summary stats
         total_items = session.execute(select(func.count(Item.id)).where(Item.status == "active")).scalar()
@@ -812,9 +826,6 @@ def analytics_page(request: Request):
             .join(ItemAuthor, ItemAuthor.author_id == Author.id)
             .join(Item, Item.id == ItemAuthor.item_id)
             .where(Item.status == "active")
-        ).scalar()
-        total_venues = session.execute(
-            select(func.count(func.distinct(Item.venue))).where(Item.venue.is_not(None), Item.status == "active")
         ).scalar()
 
         # Clustering (catch errors gracefully)
@@ -842,10 +853,9 @@ def analytics_page(request: Request):
                 "total_items": total_items,
                 "total_tags": total_tags,
                 "total_authors": total_authors,
-                "total_venues": total_venues,
                 "by_year": by_year,
                 "by_month": by_month,
-                "venues": venues,
+                "tag_trend": tag_trend,
                 "tags": tags,
                 "authors": authors,
                 "by_type": by_type,
