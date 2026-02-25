@@ -22,7 +22,6 @@ from app.core.models import (
     Tag,
 )
 
-
 _VENUE_NAMES = frozenset({
     "acl", "emnlp", "naacl", "eacl", "coling", "ijcnlp", "aacl",
     "iclr", "neurips", "nips", "icml", "aaai", "ijcai",
@@ -304,7 +303,9 @@ def ensure_note(session: Session, item: Item) -> Note:
     return note
 
 
-def add_tag_to_item(session: Session, item_id: int, tag_name: str, source: str = "manual", kind: str | None = None) -> ItemTag:
+def add_tag_to_item(
+    session: Session, item_id: int, tag_name: str, source: str = "manual", kind: str | None = None
+) -> ItemTag:
     """Add a tag to an item. Idempotent — returns existing ItemTag if already present."""
     tag = get_or_create_tag(session, tag_name, kind=kind)
     existing = session.execute(

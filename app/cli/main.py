@@ -202,10 +202,11 @@ def tag_migrate_kinds(
     dry_run: bool = typer.Option(True, "--dry-run/--apply"),
 ):
     """既存タグを命名規則で kind 分類する。"""
+    from sqlalchemy import select
+
     from app.core.db import get_session, init_db
     from app.core.models import Tag
     from app.core.service import infer_tag_kind
-    from sqlalchemy import select
 
     init_db()
     session = get_session()
