@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 _engine = None
 _SessionLocal = None
 
-SCHEMA_VERSION = 5  # Current schema version
+SCHEMA_VERSION = 6  # Current schema version
 
 
 def get_engine(db_path: Path | None = None):
@@ -180,12 +180,27 @@ def _migration_v5(engine):
     logger.info("Migration v5: created view_history table")
 
 
+def _migration_v6(engine):
+    """v0.9: add kind column to tags table."""
+    insp = inspect(engine)
+    with engine.connect() as conn:
+        if "tags" in insp.get_table_names():
+            existing = [c["name"] for c in insp.get_columns("tags")]
+            if "kind" not in existing:
+                conn.execute(text(
+                    "ALTER TABLE tags ADD COLUMN kind VARCHAR(32) NOT NULL DEFAULT 'topic'"
+                ))
+                logger.info("Migration v6: added tags.kind column")
+        conn.commit()
+
+
 MIGRATIONS = {
     1: ("v0.4 column additions", _migration_v1),
     2: ("v0.5 job summary + timestamps", _migration_v2),
     3: ("v0.6 auto-accept + dedup columns", _migration_v3),
     4: ("v0.7 version management columns", _migration_v4),
     5: ("v0.8 view history table", _migration_v5),
+    6: ("v0.9 tag kind column", _migration_v6),
 }
 
 

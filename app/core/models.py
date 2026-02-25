@@ -123,6 +123,8 @@ class Tag(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     name = Column(String(256), nullable=False, unique=True)
+    kind = Column(String(32), nullable=False, server_default="topic", default="topic")
+    # kind values: "venue" | "track" | "source" | "status" | "topic"
 
 
 class ItemTag(Base):

@@ -197,6 +197,37 @@ def tag_ls(
         session.close()
 
 
+@tag_app.command("migrate-kinds")
+def tag_migrate_kinds(
+    dry_run: bool = typer.Option(True, "--dry-run/--apply"),
+):
+    """既存タグを命名規則で kind 分類する。"""
+    from app.core.db import get_session, init_db
+    from app.core.models import Tag
+    from app.core.service import infer_tag_kind
+    from sqlalchemy import select
+
+    init_db()
+    session = get_session()
+    try:
+        tags = session.execute(select(Tag)).scalars().all()
+        changes = [(t, infer_tag_kind(t.name)) for t in tags if t.kind != infer_tag_kind(t.name)]
+        if not changes:
+            typer.echo("変更なし。")
+            return
+        for tag, new_kind in changes:
+            typer.echo(f"  '{tag.name}'  {tag.kind!r} -> {new_kind!r}")
+        if dry_run:
+            typer.echo(f"\n--apply で {len(changes)} 件を適用")
+        else:
+            for tag, new_kind in changes:
+                tag.kind = new_kind
+            session.commit()
+            typer.echo(f"{len(changes)} 件の kind を更新しました。")
+    finally:
+        session.close()
+
+
 @app.command("import")
 def import_cmd(
     spec: str = typer.Argument(

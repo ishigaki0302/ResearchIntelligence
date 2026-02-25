@@ -169,7 +169,7 @@ def accept_inbox_item(session: Session, inbox_item: InboxItem) -> Item:
     inbox_item.status = "accepted"
     inbox_item.accepted_item_id = item.id
 
-    add_tag_to_item(session, item.id, "watch/" + inbox_item.watch.name, source="watch")
+    add_tag_to_item(session, item.id, "watch/" + inbox_item.watch.name, source="watch", kind="source")
 
     session.flush()
     return item
