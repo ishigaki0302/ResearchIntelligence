@@ -30,8 +30,13 @@
         <label>タグ:</label>
         <select name="tag">
             <option value="">すべて</option>
-            {% for t in all_tags %}
-            <option value="{{ t.name }}" {% if tag == t.name %}selected{% endif %}>{{ t.name }}</option>
+            {% set KIND_LABELS = {"status":"ステータス","venue":"会場","track":"トラック","source":"ソース","topic":"トピック"} %}
+            {% for kind, kind_tags in all_tags_grouped %}
+            <optgroup label="{{ KIND_LABELS.get(kind, kind) }}">
+                {% for t in kind_tags %}
+                <option value="{{ t.name }}" {% if tag == t.name %}selected{% endif %}>{{ t.name }}</option>
+                {% endfor %}
+            </optgroup>
             {% endfor %}
         </select>
         <label>種別:</label>
