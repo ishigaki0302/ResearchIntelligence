@@ -14,9 +14,19 @@
         <label>著者:</label>
         <input type="text" name="author" value="{{ author }}" placeholder="著者名" style="width:140px;">
         <label>年:</label>
-        <input type="text" name="year" value="{{ year }}" placeholder="2024 or 2023:2024" style="width:120px;">
+        <select name="year">
+            <option value="">すべて</option>
+            {% for y in all_years %}
+            <option value="{{ y }}" {% if year == y|string %}selected{% endif %}>{{ y }}</option>
+            {% endfor %}
+        </select>
         <label>会場:</label>
-        <input type="text" name="venue" value="{{ venue }}" placeholder="ACL" style="width:100px;">
+        <select name="venue">
+            <option value="">すべて</option>
+            {% for v in all_venues %}
+            <option value="{{ v }}" {% if venue == v %}selected{% endif %}>{{ v }}</option>
+            {% endfor %}
+        </select>
         <label>タグ:</label>
         <select name="tag">
             <option value="">すべて</option>
