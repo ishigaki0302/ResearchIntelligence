@@ -784,6 +784,40 @@ def analytics_page(request: Request):
         session.close()
 
 
+@app.get("/papers", response_class=HTMLResponse)
+def papers_list(request: Request, page: int = Query(1, ge=1), per_page: int = Query(50, ge=1, le=100)):
+    session = get_session()
+    try:
+        total = session.execute(select(func.count(Item.id)).where(Item.status == "active")).scalar()
+        total_pages = max(1, (total + per_page - 1) // per_page)
+        page = min(page, total_pages)
+        offset = (page - 1) * per_page
+        items = (
+            session.execute(
+                select(Item)
+                .where(Item.status == "active")
+                .order_by(Item.created_at.desc(), Item.id.desc())
+                .offset(offset)
+                .limit(per_page)
+            )
+            .scalars()
+            .all()
+        )
+        return templates.TemplateResponse(
+            "papers.html",
+            {
+                "request": request,
+                "items": items,
+                "page": page,
+                "per_page": per_page,
+                "total": total,
+                "total_pages": total_pages,
+            },
+        )
+    finally:
+        session.close()
+
+
 @app.get("/collections", response_class=HTMLResponse)
 def collections_list(request: Request):
     session = get_session()
