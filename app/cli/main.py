@@ -237,6 +237,7 @@ def import_cmd(
     title: Optional[str] = typer.Option(None, "--title", help="Title (for pdf/url imports)"),
     year: Optional[int] = typer.Option(None, "--year", help="Year (for pdf/url imports)"),
     item_type: str = typer.Option("blog", "--type", help="Item type for url imports"),
+    tags: Optional[str] = typer.Option(None, "--tags", help="Comma-separated tags to add (e.g. 'to-read,survey')"),
 ):
     """Import papers from various sources."""
     from app.core.db import init_db
@@ -254,6 +255,7 @@ def import_cmd(
     parsed = parse_import_spec(spec)
     src_type = parsed["type"]
     args = parsed["args"]
+    tag_list = [t.strip() for t in tags.split(",") if t.strip()] if tags else []
 
     if src_type == "acl":
         typer.echo(
@@ -270,21 +272,21 @@ def import_cmd(
 
     elif src_type == "pdf":
         typer.echo(f"Importing PDF: {args['path']}")
-        result = import_pdf(args["path"], title=title, year=year)
+        result = import_pdf(args["path"], title=title, year=year, tags=tag_list)
         typer.echo(
             f"{'Created' if result['created'] else 'Already exists'}: {result['title']} (id={result['item_id']})"
         )
 
     elif src_type == "url":
         typer.echo(f"Importing URL: {args['url']}")
-        result = import_url(args["url"], item_type=item_type, title=title, year=year)
+        result = import_url(args["url"], item_type=item_type, title=title, year=year, tags=tag_list)
         typer.echo(
             f"{'Created' if result['created'] else 'Already exists'}: {result['title']} (id={result['item_id']})"
         )
 
     elif src_type == "title":
         typer.echo(f"Searching for: {args['query']!r}")
-        result = import_by_title(args["query"])
+        result = import_by_title(args["query"], tags=tag_list)
         source_label = {"arxiv": "arXiv BibTeX", "s2": "Semantic Scholar", "placeholder": "placeholder (no match)"}.get(
             result["source"], result["source"]
         )
