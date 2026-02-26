@@ -17,8 +17,8 @@
         <div class="stat-label">著者数</div>
     </div>
     <div class="stat-box">
-        <div class="stat-num">{{ total_tags }}</div>
-        <div class="stat-label">タグ数</div>
+        <div class="stat-num">{{ total_venues }}</div>
+        <div class="stat-label">会場数</div>
     </div>
 </div>
 
@@ -42,20 +42,20 @@
     </div>
 </div>
 
-{# ─── Row 2: タグ年別推移 + タグ分布 ─── #}
+{# ─── Row 2: 会場年別推移 + 会場ランキング ─── #}
 <div style="display:grid; grid-template-columns:1fr 1fr; gap:1.5rem; margin-bottom:1.5rem;">
     <div class="card">
-        <h2 style="margin-bottom:1rem;">タグ年別推移（上位 {{ tag_trend.series|length }} タグ）</h2>
-        {% if tag_trend.series %}
-        <canvas id="chartTagTrend" height="260"></canvas>
+        <h2 style="margin-bottom:1rem;">会場年別推移（上位 {{ venue_trend.series|length }} 会場）</h2>
+        {% if venue_trend.series %}
+        <canvas id="chartVenueTrend" height="260"></canvas>
         {% else %}
         <p class="meta">データがありません。</p>
         {% endif %}
     </div>
     <div class="card">
-        <h2 style="margin-bottom:1rem;">上位タグ Top {{ tags|length }}</h2>
-        {% if tags %}
-        <canvas id="chartTags" height="260"></canvas>
+        <h2 style="margin-bottom:1rem;">会場ランキング Top {{ venues|length }}</h2>
+        {% if venues %}
+        <canvas id="chartVenues" height="260"></canvas>
         {% else %}
         <p class="meta">データがありません。</p>
         {% endif %}
@@ -244,15 +244,15 @@
     });
     {% endif %}
 
-    {% if tag_trend.series %}
+    {% if venue_trend.series %}
     {
-        const trend = {{ tag_trend | tojson }};
-        new Chart(document.getElementById('chartTagTrend'), {
+        const trend = {{ venue_trend | tojson }};
+        new Chart(document.getElementById('chartVenueTrend'), {
             type: 'line',
             data: {
                 labels: trend.years,
                 datasets: trend.series.map((s, i) => ({
-                    label: s.tag,
+                    label: s.venue,
                     data: s.data,
                     borderColor: PALETTE[i % PALETTE.length],
                     backgroundColor: 'transparent',
@@ -273,14 +273,14 @@
     }
     {% endif %}
 
-    {% if tags %}
-    new Chart(document.getElementById('chartTags'), {
+    {% if venues %}
+    new Chart(document.getElementById('chartVenues'), {
         type: 'bar',
         data: {
-            labels: {{ tags | tojson }}.map(d => d.tag),
+            labels: {{ venues | tojson }}.map(d => d.venue),
             datasets: [{
                 label: '件数',
-                data: {{ tags | tojson }}.map(d => d.count),
+                data: {{ venues | tojson }}.map(d => d.count),
                 backgroundColor: TEAL,
                 borderRadius: 3,
             }]
