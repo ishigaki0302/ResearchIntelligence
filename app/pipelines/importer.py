@@ -115,6 +115,7 @@ def import_pdf(
     path: str | Path,
     title: str | None = None,
     year: int | None = None,
+    tags: list[str] | None = None,
     session: Session | None = None,
 ) -> dict[str, Any]:
     """Import a single PDF file.
@@ -139,6 +140,7 @@ def import_pdf(
             title=title,
             year=year,
             pdf_source=str(path),
+            tags=tags or [],
         )
         session.commit()
     except Exception:
@@ -156,6 +158,7 @@ def import_url(
     item_type: str = "blog",
     title: str | None = None,
     year: int | None = None,
+    tags: list[str] | None = None,
     session: Session | None = None,
 ) -> dict[str, Any]:
     """Import a URL (blog, slide, etc.)."""
@@ -175,6 +178,7 @@ def import_url(
             year=year,
             source_url=url,
             external_ids={"url": url},
+            tags=tags or [],
         )
         session.commit()
         item_id = item.id
@@ -286,7 +290,7 @@ def _title_score(query: str, candidate: str) -> float:
     return 0.7 * overlap / max(len(q_words), len(c_words))
 
 
-def import_by_title(query: str, session: Session | None = None) -> dict[str, Any]:
+def import_by_title(query: str, tags: list[str] | None = None, session: Session | None = None) -> dict[str, Any]:
     """Import a paper by title, resolving metadata via Semantic Scholar + arXiv.
 
     Returns: {"item_id": int, "created": bool, "title": str, "source": str}
@@ -359,6 +363,7 @@ def import_by_title(query: str, session: Session | None = None) -> dict[str, Any
                         bibtex_key=bib_key or None,
                         bibtex_raw=bibtex_raw,
                         external_ids={"arxiv": arxiv_id},
+                        tags=tags or [],
                     )
                     session.commit()
                     item_id = item.id
@@ -398,6 +403,7 @@ def import_by_title(query: str, session: Session | None = None) -> dict[str, Any
                 abstract=abstract,
                 venue=venue,
                 external_ids=external_ids,
+                tags=tags or [],
             )
             session.commit()
             item_id = item.id
@@ -406,7 +412,7 @@ def import_by_title(query: str, session: Session | None = None) -> dict[str, Any
 
         # 4. No match — import as placeholder
         logger.warning(f"No Semantic Scholar match found for title: {query!r} (best score={best_score:.2f})")
-        item, created = upsert_item(session, title=query)
+        item, created = upsert_item(session, title=query, tags=tags or [])
         session.commit()
         item_id = item.id
         item_title = item.title
