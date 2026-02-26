@@ -241,6 +241,11 @@ ri tag ls 42                         # アイテムのタグ一覧
 # タグ種別 (kind) 管理（v0.9 新機能）
 ri tag migrate-kinds --dry-run       # 既存タグの kind 分類をプレビュー
 ri tag migrate-kinds --apply         # 分類を適用（venue/track/source/status/topic）
+
+# インポート時のタグ同時指定（v0.9.1 新機能）
+ri import url:https://arxiv.org/abs/... --tags "to-read,survey"
+ri import pdf:/path/to/paper.pdf --tags "mine,read"
+ri import title:"attention is all you need" --tags "to-read"
 ```
 
 タグは命名規則で自動分類されます:
