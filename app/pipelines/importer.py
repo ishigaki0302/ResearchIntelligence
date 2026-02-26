@@ -382,7 +382,8 @@ def import_by_title(query: str, tags: list[str] | None = None, session: Session 
                     abstract = re.sub(r"[{}]", "", entry.get("abstract", "")).strip()
                     url = entry.get("url", f"https://aclanthology.org/{acl_id}")
                     bib_key = entry.get("ID", "")
-                    venue = normalize_venue(re.sub(r"[{}]", "", entry.get("booktitle", entry.get("journal", ""))).strip()) or None
+                    raw_venue = re.sub(r"[{}]", "", entry.get("booktitle", entry.get("journal", ""))).strip()
+                    venue = normalize_venue(raw_venue) or None
 
                     raw_lines = [f"@{etype}{{{bib_key},"]
                     for k, v in sorted(entry.items()):
