@@ -24,6 +24,43 @@ from app.core.service import upsert_item
 
 logger = logging.getLogger(__name__)
 
+# venue 正規化マップ: 長い名称 → 略名
+# ACL BibTeX の booktitle や S2 の venue フィールドはバラつきが多いため統一する
+_VENUE_NORMALIZE: list[tuple[str, str]] = [
+    # ACL系 — Findings は親会場と同じ略名にする（トラックは tags で管理）
+    (r"findings.*acl|acl.*findings", "ACL"),
+    (r"findings.*emnlp|emnlp.*findings", "EMNLP"),
+    (r"findings.*naacl|naacl.*findings", "NAACL"),
+    (r"findings.*eacl|eacl.*findings", "EACL"),
+    (r"findings.*coling|coling.*findings", "COLING"),
+    (r"annual meeting.*association for computational linguistics", "ACL"),
+    (r"empirical methods in natural language processing", "EMNLP"),
+    (r"north american chapter.*association for computational linguistics", "NAACL"),
+    (r"european chapter.*association for computational linguistics", "EACL"),
+    (r"international conference on computational linguistics", "COLING"),
+    (r"transactions of the association for computational linguistics", "TACL"),
+    (r"acl[-– ]ijcnlp", "ACL"),
+    (r"joint conference.*computational linguistics.*natural language processing", "EMNLP"),
+    # ML系
+    (r"international conference on learning representations", "ICLR"),
+    (r"international conference on machine learning", "ICML"),
+    (r"neural information processing systems|advances in neural information processing", "NeurIPS"),
+    (r"aaai conference on artificial intelligence", "AAAI"),
+    (r"international joint conference on artificial intelligence", "IJCAI"),
+    (r"natural language processing and chinese computing", "NLPCC"),
+]
+
+
+def normalize_venue(raw: str) -> str:
+    """長い会場名を略名に正規化する (e.g. 'Proceedings of the 60th ACL...' -> 'ACL')."""
+    if not raw:
+        return raw
+    lower = raw.lower()
+    for pattern, short in _VENUE_NORMALIZE:
+        if re.search(pattern, lower):
+            return short
+    return raw
+
 
 def import_bibtex(path: str | Path, session: Session | None = None) -> dict[str, Any]:
     """Import papers from a .bib file.
@@ -234,7 +271,7 @@ def import_acl(
                 title=paper["title"],
                 authors=paper.get("authors", []),
                 year=paper.get("year"),
-                venue=paper.get("venue"),
+                venue=normalize_venue(paper.get("venue") or ""),
                 venue_instance=paper.get("venue_instance"),
                 abstract=paper.get("abstract"),
                 source_url=paper.get("source_url"),
@@ -317,9 +354,68 @@ def import_by_title(query: str, tags: list[str] | None = None, session: Session 
         if best and best_score >= 0.8:
             ext_ids = best.get("externalIds") or {}
             arxiv_id = ext_ids.get("ArXiv")
+            acl_id = ext_ids.get("ACL")  # ACL Anthology ID (e.g. "2022.emnlp-main.797")
+
+            if acl_id:
+                # 3a. ACL Anthology を優先: @inproceedings で venue/pages/doi などが揃う
+                bib_url = f"https://aclanthology.org/{acl_id}.bib"
+                try:
+                    resp = requests.get(bib_url, timeout=15)
+                    resp.raise_for_status()
+                    entries = parse_bibtex_string(resp.text)
+                except Exception as e:
+                    logger.warning(f"Failed to fetch ACL BibTeX for {acl_id}: {e}")
+                    entries = []
+
+                if entries:
+                    entry = entries[0]
+                    etype = entry.get("ENTRYTYPE", "inproceedings")
+                    title = re.sub(r"[{}]", "", entry.get("title", query).strip())
+                    author_str = entry.get("author", "")
+                    authors = parse_author_string(author_str) if author_str else []
+                    year = None
+                    if "year" in entry:
+                        try:
+                            year = int(entry["year"])
+                        except (ValueError, TypeError):
+                            pass
+                    abstract = re.sub(r"[{}]", "", entry.get("abstract", "")).strip()
+                    url = entry.get("url", f"https://aclanthology.org/{acl_id}")
+                    bib_key = entry.get("ID", "")
+                    venue = normalize_venue(re.sub(r"[{}]", "", entry.get("booktitle", entry.get("journal", ""))).strip()) or None
+
+                    raw_lines = [f"@{etype}{{{bib_key},"]
+                    for k, v in sorted(entry.items()):
+                        if k in ("ENTRYTYPE", "ID"):
+                            continue
+                        raw_lines.append(f"  {k} = {{{v}}},")
+                    raw_lines.append("}")
+                    bibtex_raw = "\n".join(raw_lines)
+
+                    ext_id_map: dict[str, str] = {"acl": acl_id}
+                    if arxiv_id:
+                        ext_id_map["arxiv"] = arxiv_id
+
+                    item, created = upsert_item(
+                        session,
+                        title=title,
+                        authors=authors,
+                        year=year,
+                        abstract=abstract,
+                        venue=venue,
+                        source_url=url,
+                        bibtex_key=bib_key or None,
+                        bibtex_raw=bibtex_raw,
+                        external_ids=ext_id_map,
+                        tags=tags or [],
+                    )
+                    session.commit()
+                    item_id = item.id
+                    item_title = item.title
+                    return {"item_id": item_id, "created": created, "title": item_title, "source": "acl"}
 
             if arxiv_id:
-                # 3a. Fetch arXiv BibTeX for richest metadata
+                # 3b. ACL IDなし → arXiv BibTeX にフォールバック
                 bib_url = f"https://arxiv.org/bibtex/{arxiv_id}"
                 try:
                     resp = requests.get(bib_url, timeout=15)
@@ -378,7 +474,7 @@ def import_by_title(query: str, tags: list[str] | None = None, session: Session 
                 year = details.get("year")
                 abstract = details.get("abstract") or ""
                 venue_obj = details.get("publicationVenue") or {}
-                venue = venue_obj.get("name") or details.get("venue") or None
+                venue = normalize_venue(venue_obj.get("name") or details.get("venue") or "")
                 authors_raw = details.get("authors") or []
                 authors = [a.get("name", "") for a in authors_raw if a.get("name")]
                 s2_ext = details.get("externalIds") or {}
