@@ -83,10 +83,14 @@ def _load_vllm(model: str, llm_cfg: dict):
         tensor_parallel = llm_cfg.get("tensor_parallel", 1)
         max_model_len = llm_cfg.get("max_model_len", 8192)
         logger.info(f"Loading vLLM engine: {model} (tensor_parallel={tensor_parallel})")
+        gpu_memory_utilization = llm_cfg.get("gpu_memory_utilization", 0.85)
+        max_num_seqs = llm_cfg.get("max_num_seqs", 8)
         engine = LLM(
             model=model,
             tensor_parallel_size=tensor_parallel,
             max_model_len=max_model_len,
+            gpu_memory_utilization=gpu_memory_utilization,
+            max_num_seqs=max_num_seqs,
             trust_remote_code=True,
             dtype="bfloat16",
         )

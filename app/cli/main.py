@@ -1494,6 +1494,7 @@ def llm_tldr(
 def llm_extract_entities(
     venue: str = typer.Option("NLP2026", "--venue", help="Target venue_instance"),
     limit: int = typer.Option(0, "--limit", help="Max items (0=all)"),
+    batch_size: int = typer.Option(4, "--batch-size", help="Items per LLM batch (reduce if OOM)"),
 ):
     """Extract NLP tasks/methods/datasets from papers using LLM."""
     from app.core.db import get_session, init_db
@@ -1502,7 +1503,7 @@ def llm_extract_entities(
     init_db()
     session = get_session()
     try:
-        typer.echo(f"エンティティ抽出開始: venue={venue}")
+        typer.echo(f"エンティティ抽出開始: venue={venue}, batch_size={batch_size}")
         item_ids = None
         if limit:
             from app.core.models import Item
@@ -1512,7 +1513,7 @@ def llm_extract_entities(
             ).scalars().all()
             item_ids = list(items)
 
-        result = extract_entities_batch(session, venue_instance=venue, item_ids=item_ids)
+        result = extract_entities_batch(session, venue_instance=venue, item_ids=item_ids, batch_size=batch_size)
         typer.echo(f"完了: 処理={result['processed']}, タグ追加={result['tags_added']}, 失敗={result['failed']}")
     finally:
         session.close()

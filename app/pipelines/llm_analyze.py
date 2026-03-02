@@ -171,7 +171,7 @@ def extract_entities_batch(
     session: Session,
     venue_instance: Optional[str] = None,
     item_ids: Optional[list[int]] = None,
-    batch_size: int = 16,
+    batch_size: int = 4,
 ) -> dict:
     """Extract NLP entities from papers and save as tags.
 

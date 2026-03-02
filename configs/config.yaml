@@ -90,6 +90,9 @@ gpu:
     max_model_len: 8192
     temperature: 0.1
     max_new_tokens: 512
+    # OOM対策: vLLM メモリ設定
+    # gpu_memory_utilization: 0.85   # デフォルト0.85。OOM時は0.75〜0.80に下げる
+    # max_num_seqs: 8                # 同時処理シーケンス数。OOM時は4に下げる
     # For quantization with transformers backend:
     # load_in_8bit: true
     # load_in_4bit: false
