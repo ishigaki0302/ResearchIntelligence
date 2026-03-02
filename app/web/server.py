@@ -878,6 +878,51 @@ def analytics_page(request: Request):
         session.close()
 
 
+@app.get("/analytics/nlp2026", response_class=HTMLResponse)
+def nlp2026_analytics(request: Request):
+    """NLP2026-specific analysis dashboard."""
+    from app.analytics.collab_network import (
+        top_authors_ranking,
+        session_distribution,
+        keyword_frequency,
+        build_coauthor_graph,
+    )
+    from app.gpu import is_gpu_available
+
+    session = get_session()
+    try:
+        venue = "NLP2026"
+        top_authors = top_authors_ranking(session, venue_instance=venue, top_n=30)
+        session_dist = session_distribution(session, venue_instance=venue)
+        keywords = keyword_frequency(session, venue_instance=venue, top_n=50)
+        graph = build_coauthor_graph(session, venue_instance=venue, min_edge_weight=1)
+
+        total = session.execute(
+            select(func.count(Item.id)).where(Item.venue_instance == venue, Item.status == "active")
+        ).scalar()
+        total_authors = session.execute(
+            select(func.count(func.distinct(ItemAuthor.author_id)))
+            .join(Item, Item.id == ItemAuthor.item_id)
+            .where(Item.venue_instance == venue, Item.status == "active")
+        ).scalar()
+
+        return templates.TemplateResponse(
+            "nlp2026_analytics.html",
+            {
+                "request": request,
+                "total": total,
+                "total_authors": total_authors,
+                "top_authors": top_authors,
+                "session_dist": session_dist,
+                "keywords": keywords,
+                "graph": graph,
+                "gpu_available": is_gpu_available(),
+            },
+        )
+    finally:
+        session.close()
+
+
 @app.get("/papers", response_class=HTMLResponse)
 def papers_list(request: Request, page: int = Query(1, ge=1), per_page: int = Query(50, ge=1, le=100)):
     session = get_session()

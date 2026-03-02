@@ -43,8 +43,8 @@ external:
     sleep_sec: 1.0
 
 web:
-  host: "127.0.0.1"
-  port: 8000
+  host: "0.0.0.0"
+  port: 8502
 
 search:
   default_top_k: 20
@@ -72,3 +72,28 @@ notes:
 
 analytics:
   default_clusters: 5
+
+# GPU analysis settings (only used when CUDA is available)
+# On CPU-only machines (e.g., Mac), all gpu settings are ignored gracefully.
+gpu:
+  enabled: auto  # auto (detect CUDA) / true / false
+
+  embedding:
+    model: BAAI/bge-m3        # multilingual high-quality embedding
+    batch_size: 256
+    # Alternative: Qwen/Qwen3-Embedding-8B
+
+  llm:
+    backend: vllm             # vllm / transformers / openai / none
+    model: Qwen/Qwen2.5-32B-Instruct
+    tensor_parallel: 2        # number of GPUs for tensor parallelism
+    max_model_len: 8192
+    temperature: 0.1
+    max_new_tokens: 512
+    # For quantization with transformers backend:
+    # load_in_8bit: true
+    # load_in_4bit: false
+    # For OpenAI-compatible server:
+    # backend: openai
+    # api_base: http://localhost:8000/v1
+    # api_key: EMPTY
