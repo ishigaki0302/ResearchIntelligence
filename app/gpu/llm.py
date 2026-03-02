@@ -75,6 +75,10 @@ def load_engine():
 
 def _load_vllm(model: str, llm_cfg: dict):
     try:
+        # vLLM のデフォルト multiproc method は "fork" だが、
+        # CUDA 初期化済みプロセスを fork するとワーカーが再初期化できずに
+        # RuntimeError になる。"spawn" に切り替えて回避する。
+        os.environ.setdefault("VLLM_WORKER_MULTIPROC_METHOD", "spawn")
         from vllm import LLM, SamplingParams  # noqa: F401
         tensor_parallel = llm_cfg.get("tensor_parallel", 1)
         max_model_len = llm_cfg.get("max_model_len", 8192)
