@@ -85,7 +85,7 @@ gpu:
 
   llm:
     backend: vllm             # vllm / transformers / openai / none
-    model: Qwen/Qwen2.5-32B-Instruct
+    model: Qwen/Qwen3.5-27B
     tensor_parallel: 2        # number of GPUs for tensor parallelism
     max_model_len: 8192
     temperature: 0.1
