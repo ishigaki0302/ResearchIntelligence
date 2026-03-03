@@ -55,13 +55,63 @@ def _extract_keywords(texts: list[str], top_n: int = 5) -> list[str]:
     from collections import Counter
 
     _STOPWORDS = {
-        "the", "a", "an", "in", "of", "for", "and", "or", "to", "is", "are",
-        "with", "on", "we", "our", "that", "this", "from", "by", "be", "as",
-        "it", "its", "at", "not", "can", "has", "have", "also", "which",
-        "using", "based", "new", "show", "propose", "proposed", "paper",
-        "model", "models", "method", "methods", "approach", "approaches",
-        "result", "results", "performance", "high", "large", "pre", "trained",
-        "language", "work", "task", "tasks", "data", "dataset", "datasets",
+        "the",
+        "a",
+        "an",
+        "in",
+        "of",
+        "for",
+        "and",
+        "or",
+        "to",
+        "is",
+        "are",
+        "with",
+        "on",
+        "we",
+        "our",
+        "that",
+        "this",
+        "from",
+        "by",
+        "be",
+        "as",
+        "it",
+        "its",
+        "at",
+        "not",
+        "can",
+        "has",
+        "have",
+        "also",
+        "which",
+        "using",
+        "based",
+        "new",
+        "show",
+        "propose",
+        "proposed",
+        "paper",
+        "model",
+        "models",
+        "method",
+        "methods",
+        "approach",
+        "approaches",
+        "result",
+        "results",
+        "performance",
+        "high",
+        "large",
+        "pre",
+        "trained",
+        "language",
+        "work",
+        "task",
+        "tasks",
+        "data",
+        "dataset",
+        "datasets",
     }
     words = []
     for text in texts:
@@ -79,12 +129,10 @@ def _llm_label_cluster(representative_titles: list[str], representative_abstract
     try:
         from app.gpu.llm import generate_single  # type: ignore
 
-        context = "\n".join(
-            f"- {t}: {a[:200]}" for t, a in zip(representative_titles, representative_abstracts) if t
-        )
+        context = "\n".join(f"- {t}: {a[:200]}" for t, a in zip(representative_titles, representative_abstracts) if t)
         prompt = (
             "以下の論文グループにラベルをつけてください。\n"
-            "JSON のみ出力: {\"en\": \"<English label>\", \"ja\": \"<日本語ラベル>\"}\n\n"
+            'JSON のみ出力: {"en": "<English label>", "ja": "<日本語ラベル>"}\n\n'
             f"論文一覧:\n{context}"
         )
         text = generate_single(prompt, max_new_tokens=80, temperature=0.1)
@@ -152,8 +200,7 @@ def cluster_corpus(
     from sqlalchemy import select
 
     all_items: dict[int, Item] = {
-        it.id: it
-        for it in session.execute(select(Item).where(Item.type == "corpus")).scalars().all()
+        it.id: it for it in session.execute(select(Item).where(Item.type == "corpus")).scalars().all()
     }
 
     # --- Per-cluster summary ---
