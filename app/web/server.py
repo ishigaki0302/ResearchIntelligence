@@ -910,3 +910,50 @@ def papers_list(request: Request, page: int = Query(1, ge=1), per_page: int = Qu
         )
     finally:
         session.close()
+
+
+@app.get("/corpus/atlas", response_class=HTMLResponse)
+def corpus_atlas(request: Request):
+    """Topic Atlas: UMAP scatter plot + cluster summary."""
+    import json as _json
+
+    from app.core.config import get_config as _get_config
+    from app.core.config import resolve_path as _resolve_path
+    from app.core.models import Item as _Item
+
+    cfg = _get_config()
+    corpus_dir = _resolve_path(cfg["storage"]["base_dir"]) / "corpus"
+
+    cluster_summary = []
+    umap_data = {}
+    items_meta: dict[int, dict] = {}
+
+    cluster_path = corpus_dir / "cluster_summary.json"
+    umap_path = corpus_dir / "umap2d.json"
+
+    if cluster_path.exists():
+        cluster_summary = _json.loads(cluster_path.read_text())
+    if umap_path.exists():
+        umap_data = _json.loads(umap_path.read_text())
+
+    # Load titles for items referenced in clusters
+    if cluster_summary:
+        all_ids = [pid for c in cluster_summary for pid in c.get("paper_ids", [])]
+        db = get_session()
+        try:
+            from sqlalchemy import select as _select
+
+            items = db.execute(_select(_Item).where(_Item.id.in_(all_ids))).scalars().all()
+            items_meta = {it.id: {"title": it.title, "abstract": (it.abstract or "")[:200]} for it in items}
+        finally:
+            db.close()
+
+    return templates.TemplateResponse(
+        "corpus_atlas.html",
+        {
+            "request": request,
+            "cluster_summary": cluster_summary,
+            "umap_data": umap_data,
+            "items_meta": items_meta,
+        },
+    )
