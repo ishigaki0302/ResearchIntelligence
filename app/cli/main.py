@@ -1550,6 +1550,32 @@ def corpus_personalize(
         session.close()
 
 
+@corpus_app.command("gaps")
+def corpus_gaps(
+    top_n: int = typer.Option(10, "--top", help="Number of top gaps to detect"),
+):
+    """Detect research gaps and generate experiment proposals (Top-10).
+
+    Reads tag_patterns.json (from 'ri corpus normalize-tags') and
+    personalized_top30.json (from 'ri corpus personalize').
+    Writes data/corpus/gaps_top10.json.
+    """
+    from app.analytics.corpus_gaps import detect_gaps
+    from app.core.db import get_session, init_db
+
+    init_db()
+    session = get_session()
+    try:
+        gaps = detect_gaps(session, top_n=top_n)
+        typer.echo(f"Top {len(gaps)} research gaps:\n")
+        for g in gaps:
+            typer.echo(f"  [{g['rank']:2d}] {g['description']}")
+            if g.get("experiment"):
+                typer.echo(f"       → {g['experiment'][:100]}")
+    finally:
+        session.close()
+
+
 def main():
     app()
 
