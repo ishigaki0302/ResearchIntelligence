@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% block title %}Topic Atlas — Research Intelligence{% endblock %}
+
+{% block content %}
+<div class="container">
+  <h1>Topic Atlas</h1>
+  <p style="color:var(--muted);margin-bottom:1rem;">
+    論文集全体のトピック地図。各点が1論文、色がクラスタを表します。
+  </p>
+
+  {% if not cluster_summary %}
+  <div style="border:1px solid var(--border);padding:1.5rem;border-radius:6px;background:var(--card);text-align:center;">
+    <p style="color:var(--muted);">クラスタデータがありません。以下のコマンドを実行してください:</p>
+    <pre style="margin-top:.75rem;background:#f3f4f6;padding:.75rem;border-radius:4px;text-align:left;display:inline-block;">
+ri corpus ingest --path &lt;PDFディレクトリ&gt;
+ri corpus embed
+ri corpus cluster</pre>
+  </div>
+  {% else %}
+
+  <!-- Scatter plot -->
+  <div style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:1rem;margin-bottom:1.5rem;">
+    <canvas id="atlasChart" style="width:100%;max-height:520px;"></canvas>
+  </div>
+
+  <!-- Cluster list -->
+  <h2>クラスタ一覧 ({{ cluster_summary|length }} 件)</h2>
+  <div style="display:grid;gap:.75rem;">
+    {% for c in cluster_summary %}
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:6px;padding:1rem;">
+      <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.4rem;">
+        <span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:hsl({{ (c.cluster_id * 53) % 360 }},65%,55%);"></span>
+        <strong>{{ c.label_en or ("Cluster " ~ c.cluster_id) }}</strong>
+        {% if c.label_ja and c.label_ja != c.label_en %}
+        <span style="color:var(--muted);font-size:.88rem;">/ {{ c.label_ja }}</span>
+        {% endif %}
+        <span style="margin-left:auto;color:var(--muted);font-size:.85rem;">{{ c.paper_ids|length }} 件</span>
+      </div>
+      {% if c.keywords %}
+      <div style="display:flex;flex-wrap:wrap;gap:.3rem;">
+        {% for kw in c.keywords[:8] %}
+        <span style="background:var(--accent-light);color:var(--accent);padding:.15rem .5rem;border-radius:12px;font-size:.8rem;">{{ kw }}</span>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+
+  <!-- D3 scatter plot -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+  <script>
+  (function() {
+    const clusterSummary = {{ cluster_summary | tojson }};
+    const umapData = {{ umap_data | tojson }};
+    const itemsMeta = {{ items_meta | tojson }};
+
+    // Build datasets per cluster
+    const colorForCluster = (cid) => `hsl(${(cid * 53) % 360},65%,55%)`;
+    const datasets = clusterSummary.map(c => ({
+      label: c.label_en || `Cluster ${c.cluster_id}`,
+      backgroundColor: colorForCluster(c.cluster_id) + "99",
+      borderColor: colorForCluster(c.cluster_id),
+      borderWidth: 1,
+      pointRadius: 5,
+      data: c.paper_ids
+        .filter(pid => umapData[String(pid)])
+        .map(pid => ({
+          x: umapData[String(pid)][0],
+          y: umapData[String(pid)][1],
+          _title: (itemsMeta[pid] || {}).title || String(pid),
+          _abstract: (itemsMeta[pid] || {}).abstract || "",
+        })),
+    }));
+
+    const ctx = document.getElementById("atlasChart").getContext("2d");
+    new Chart(ctx, {
+      type: "scatter",
+      data: { datasets },
+      options: {
+        responsive: true,
+        animation: false,
+        plugins: {
+          legend: { position: "right", labels: { font: { size: 11 }, boxWidth: 12 } },
+          tooltip: {
+            callbacks: {
+              label: (ctx) => {
+                const pt = ctx.raw;
+                return [ctx.dataset.label, pt._title.slice(0, 60)];
+              }
+            }
+          }
+        },
+        scales: {
+          x: { display: false },
+          y: { display: false },
+        }
+      }
+    });
+  })();
+  </script>
+  {% endif %}
+</div>
+{% endblock %}

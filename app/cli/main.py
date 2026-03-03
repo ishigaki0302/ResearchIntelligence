@@ -1464,6 +1464,35 @@ def corpus_embed(
         session.close()
 
 
+@corpus_app.command("cluster")
+def corpus_cluster(
+    method: str = typer.Option("hdbscan", "--method", help="Clustering method: hdbscan or kmeans"),
+    n_clusters: int = typer.Option(10, "--clusters", "-n", help="Number of clusters (kmeans only)"),
+    rebuild: bool = typer.Option(False, "--rebuild", help="Overwrite existing cluster_summary.json"),
+):
+    """Cluster corpus embeddings and label clusters with LLM (Topic Atlas).
+
+    Reads data/corpus/embeddings.npz + umap2d.json,
+    runs HDBSCAN or KMeans, optionally labels with LLM,
+    and writes data/corpus/cluster_summary.json.
+    """
+    from app.analytics.corpus_cluster import cluster_corpus
+    from app.core.db import get_session, init_db
+
+    init_db()
+    session = get_session()
+    try:
+        clusters = cluster_corpus(session, method=method, n_clusters=n_clusters, rebuild=rebuild)
+        typer.echo(f"Done — {len(clusters)} clusters written to data/corpus/cluster_summary.json")
+        for c in clusters[:5]:
+            label = c.get("label_en") or f"Cluster {c['cluster_id']}"
+            typer.echo(f"  [{c['cluster_id']}] {label} ({len(c['paper_ids'])} papers)")
+        if len(clusters) > 5:
+            typer.echo(f"  ... and {len(clusters) - 5} more")
+    finally:
+        session.close()
+
+
 @corpus_app.command("personalize")
 def corpus_personalize(
     profile: str = typer.Argument(..., help="Profile text or path to .txt/.bib file"),
