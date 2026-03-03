@@ -46,6 +46,9 @@ app.add_typer(backup_app)
 version_app = typer.Typer(name="version", help="Manage paper versions")
 app.add_typer(version_app)
 
+corpus_app = typer.Typer(name="corpus", help="Whole-corpus analysis pipeline")
+app.add_typer(corpus_app)
+
 
 def _collection_name_to_tag(name: str) -> str:
     """Convert a collection name to a tag.
@@ -1396,6 +1399,38 @@ def version_unlink(
         item.version_group_id = None
         session.commit()
         typer.echo(f"Removed item {item_id} from its version group.")
+    finally:
+        session.close()
+
+
+@corpus_app.command("ingest")
+def corpus_ingest(
+    path: str = typer.Argument(..., help="Directory containing PDF files"),
+    no_progress: bool = typer.Option(False, "--no-progress", help="Disable progress bar"),
+):
+    """Ingest a directory of PDFs into the corpus (idempotent).
+
+    Extracts title, abstract and full text from each PDF and registers
+    them as items in the database. Re-running is safe — already-registered
+    PDFs are skipped.
+    """
+    from app.core.db import get_session, init_db
+    from app.pipelines.corpus_ingest import ingest_directory
+
+    init_db()
+    session = get_session()
+    try:
+        result = ingest_directory(
+            pdf_dir=path,
+            session=session,
+            show_progress=not no_progress,
+        )
+        typer.echo(
+            f"Done — created: {result['created']}, "
+            f"skipped: {result['skipped']}, "
+            f"failed: {result['failed']}, "
+            f"total: {result['total']}"
+        )
     finally:
         session.close()
 
