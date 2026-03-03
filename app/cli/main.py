@@ -1464,6 +1464,35 @@ def corpus_embed(
         session.close()
 
 
+@corpus_app.command("personalize")
+def corpus_personalize(
+    profile: str = typer.Argument(..., help="Profile text or path to .txt/.bib file"),
+    top_k: int = typer.Option(30, "--top", help="Number of top papers to return"),
+    no_explain: bool = typer.Option(False, "--no-explain", help="Skip LLM explanation"),
+):
+    """Rank corpus papers by similarity to your research profile.
+
+    Reads data/corpus/embeddings.npz, embeds the profile, and ranks
+    papers by cosine similarity. Saves top-K to data/corpus/personalized_top30.json.
+    """
+    from app.core.db import get_session, init_db
+    from app.pipelines.corpus_personalize import personalize
+
+    init_db()
+    session = get_session()
+    try:
+        results = personalize(session, profile=profile, top_k=top_k, explain=not no_explain)
+        typer.echo(f"Top {len(results)} papers for your profile:\n")
+        for r in results[:10]:
+            typer.echo(f"  [{r['rank']:2d}] {r['title'][:70]} (score={r['score']:.3f})")
+            if r.get("reason"):
+                typer.echo(f"       {r['reason'][:100]}")
+        if len(results) > 10:
+            typer.echo(f"\n  ... and {len(results) - 10} more (see data/corpus/personalized_top30.json)")
+    finally:
+        session.close()
+
+
 def main():
     app()
 
