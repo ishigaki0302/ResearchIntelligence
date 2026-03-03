@@ -187,7 +187,7 @@ const graphData = {{ graph | tojson }};
 
   const label = g.append('g').selectAll('text')
     .data(graphData.nodes.filter(d => d.paper_count >= 3)).join('text')
-    .text(d => d.name.split(' ').slice(-1)[0])
+    .text(d => d.name.split(' ')[0])  // 名字（先頭要素）を表示
     .attr('font-size', 10).attr('fill', '#333')
     .attr('text-anchor', 'middle').attr('dy', '-0.8em')
     .style('pointer-events', 'none');
