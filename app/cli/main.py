@@ -1576,6 +1576,29 @@ def corpus_gaps(
         session.close()
 
 
+@corpus_app.command("report")
+def corpus_report(
+    output: Optional[str] = typer.Option(None, "--output", help="Output directory (default: data/corpus/reports/)"),
+    fmt: str = typer.Option("html", "--format", help="Output format: html or markdown"),
+):
+    """Generate the MVP corpus analysis report (HTML or Markdown).
+
+    Combines:
+      1. Topic Atlas (cluster map)
+      2. Personalized Top30 papers
+      3. Research Gaps Top10
+
+    Output: data/corpus/reports/report_<timestamp>/index.html
+    """
+    from pathlib import Path
+
+    from app.pipelines.corpus_report import generate_report
+
+    out_dir = Path(output) if output else None
+    out_path = generate_report(output_dir=out_dir, fmt=fmt)
+    typer.echo(f"Report written to: {out_path}")
+
+
 def main():
     app()
 
