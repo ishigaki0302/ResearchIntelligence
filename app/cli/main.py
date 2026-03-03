@@ -1493,6 +1493,34 @@ def corpus_cluster(
         session.close()
 
 
+@corpus_app.command("normalize-tags")
+def corpus_normalize_tags(
+    rebuild: bool = typer.Option(False, "--rebuild", help="Re-tag even already-tagged items"),
+    patterns: bool = typer.Option(True, "--patterns/--no-patterns", help="Compute co-occurrence patterns"),
+):
+    """Extract method/task/dataset/metric tags from corpus items.
+
+    Uses LLM when available, falls back to TF-IDF keywords.
+    Writes tag_cooccurrence.json and tag_patterns.json.
+    """
+    from app.core.db import get_session, init_db
+    from app.pipelines.corpus_tags import compute_tag_patterns, normalize_tags
+
+    init_db()
+    session = get_session()
+    try:
+        result = normalize_tags(session, rebuild=rebuild)
+        typer.echo(
+            f"Done — tagged: {result['tagged']}, skipped: {result['skipped']}, "
+            f"total: {result['total']}, unique tags: {result['tag_count']}"
+        )
+        if patterns and result["tagged"] > 0:
+            pat = compute_tag_patterns(session)
+            typer.echo(f"Patterns — top pairs: {len(pat['top_pairs'])}, gap candidates: {len(pat['gaps'])}")
+    finally:
+        session.close()
+
+
 @corpus_app.command("personalize")
 def corpus_personalize(
     profile: str = typer.Argument(..., help="Profile text or path to .txt/.bib file"),
