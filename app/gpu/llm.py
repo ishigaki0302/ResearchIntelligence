@@ -29,6 +29,7 @@ logger = logging.getLogger(__name__)
 
 _llm_engine = None
 _llm_backend = None
+_llm_load_attempted = False
 
 
 def _get_llm_config() -> dict:
@@ -50,13 +51,14 @@ def get_backend() -> str:
 
 def load_engine():
     """Load and cache the LLM engine. Returns None if GPU unavailable or backend=none."""
-    global _llm_engine, _llm_backend
+    global _llm_engine, _llm_backend, _llm_load_attempted
 
-    if _llm_engine is not None:
+    if _llm_load_attempted:
         return _llm_engine
 
     backend = get_backend()
     if backend == "none":
+        _llm_load_attempted = True
         return None
 
     llm_cfg = _get_llm_config()
@@ -70,6 +72,7 @@ def load_engine():
         _llm_engine = _load_openai(llm_cfg)
 
     _llm_backend = backend
+    _llm_load_attempted = True
     return _llm_engine
 
 
@@ -265,6 +268,7 @@ def generate_single(
 
 def reset_engine():
     """Reset the cached LLM engine."""
-    global _llm_engine, _llm_backend
+    global _llm_engine, _llm_backend, _llm_load_attempted
     _llm_engine = None
     _llm_backend = None
+    _llm_load_attempted = False
