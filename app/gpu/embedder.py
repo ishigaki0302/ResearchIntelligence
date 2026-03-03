@@ -44,7 +44,6 @@ def get_gpu_embedder():
 
     try:
         from sentence_transformers import SentenceTransformer
-        import torch
 
         device = "cuda"
         logger.info(f"Loading GPU embedding model: {model_name}")
@@ -84,6 +83,7 @@ def gpu_embed_texts(
 
     # CPU fallback — use existing sentence-transformers engine
     from app.indexing.engine import embed_texts
+
     return embed_texts(texts)
 
 

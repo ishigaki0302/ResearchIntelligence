@@ -6,7 +6,6 @@ Covers Issue #53 (NLP2026 Author/Institution Network Analysis).
 Requires: networkx (already in dependencies)
 """
 
-import json
 import logging
 import re
 from collections import Counter, defaultdict
@@ -15,7 +14,7 @@ from typing import Optional
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.models import Author, Item, ItemAuthor, Tag, ItemTag
+from app.core.models import Author, Item, ItemAuthor, ItemTag, Tag
 
 logger = logging.getLogger(__name__)
 
@@ -138,10 +137,7 @@ def top_authors_ranking(
         counter[aid] += 1
         names[aid] = name
 
-    return [
-        {"author_id": aid, "name": names[aid], "paper_count": cnt}
-        for aid, cnt in counter.most_common(top_n)
-    ]
+    return [{"author_id": aid, "name": names[aid], "paper_count": cnt} for aid, cnt in counter.most_common(top_n)]
 
 
 def institution_ranking(
@@ -172,10 +168,7 @@ def institution_ranking(
         institution = tag_name.removeprefix("affil/")
         counter[institution] += 1
 
-    return [
-        {"institution": inst, "paper_count": cnt}
-        for inst, cnt in counter.most_common(top_n)
-    ]
+    return [{"institution": inst, "paper_count": cnt} for inst, cnt in counter.most_common(top_n)]
 
 
 def session_distribution(
@@ -202,10 +195,7 @@ def session_distribution(
         if match:
             counter[match.group(1)] += 1
 
-    return [
-        {"series": series, "paper_count": cnt}
-        for series, cnt in sorted(counter.items())
-    ]
+    return [{"series": series, "paper_count": cnt} for series, cnt in sorted(counter.items())]
 
 
 def keyword_frequency(
@@ -218,8 +208,8 @@ def keyword_frequency(
 
     Works without GPU.
     """
-    from sklearn.feature_extraction.text import TfidfVectorizer
     import numpy as np
+    from sklearn.feature_extraction.text import TfidfVectorizer
 
     query = select(Item.title, Item.tldr, Item.abstract).where(Item.status == "active")
     if venue_instance:
@@ -238,14 +228,70 @@ def keyword_frequency(
     if not texts:
         return []
 
-    _STOP = frozenset([
-        "the","a","an","in","of","for","and","or","to","is","are","with","on","at",
-        "by","from","as","be","this","that","it","its","we","our","their","also",
-        "using","used","use","based","proposed","model","models","method","methods",
-        "approach","system","task","tasks","paper","work","results","show","can",
-        "two","new","large","high","data","training","learning","neural","language",
-        "natural","processing","deep","performance","evaluation","pre","fine",
-    ])
+    _STOP = frozenset(
+        [
+            "the",
+            "a",
+            "an",
+            "in",
+            "of",
+            "for",
+            "and",
+            "or",
+            "to",
+            "is",
+            "are",
+            "with",
+            "on",
+            "at",
+            "by",
+            "from",
+            "as",
+            "be",
+            "this",
+            "that",
+            "it",
+            "its",
+            "we",
+            "our",
+            "their",
+            "also",
+            "using",
+            "used",
+            "use",
+            "based",
+            "proposed",
+            "model",
+            "models",
+            "method",
+            "methods",
+            "approach",
+            "system",
+            "task",
+            "tasks",
+            "paper",
+            "work",
+            "results",
+            "show",
+            "can",
+            "two",
+            "new",
+            "large",
+            "high",
+            "data",
+            "training",
+            "learning",
+            "neural",
+            "language",
+            "natural",
+            "processing",
+            "deep",
+            "performance",
+            "evaluation",
+            "pre",
+            "fine",
+        ]
+    )
 
     try:
         vec = TfidfVectorizer(
@@ -259,10 +305,7 @@ def keyword_frequency(
         scores = np.asarray(tfidf.sum(axis=0)).flatten()
         feature_names = vec.get_feature_names_out()
         top_idx = scores.argsort()[::-1][:top_n]
-        return [
-            {"keyword": feature_names[i], "score": round(float(scores[i]), 3)}
-            for i in top_idx
-        ]
+        return [{"keyword": feature_names[i], "score": round(float(scores[i]), 3)} for i in top_idx]
     except Exception as e:
         logger.warning(f"keyword_frequency failed: {e}")
         return []

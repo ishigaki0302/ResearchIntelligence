@@ -22,8 +22,8 @@ import logging
 import os
 from typing import Optional
 
-from app.gpu import is_gpu_available
 from app.core.config import get_config
+from app.gpu import is_gpu_available
 
 logger = logging.getLogger(__name__)
 
@@ -85,6 +85,7 @@ def _load_vllm(model: str, llm_cfg: dict):
         # V0 エンジンでは CUDA fork 問題を spawn で回避する。
         os.environ.setdefault("VLLM_WORKER_MULTIPROC_METHOD", "spawn")
         from vllm import LLM, SamplingParams  # noqa: F401
+
         tensor_parallel = llm_cfg.get("tensor_parallel", 1)
         max_model_len = llm_cfg.get("max_model_len", 8192)
         logger.info(f"Loading vLLM engine: {model} (tensor_parallel={tensor_parallel})")
@@ -138,6 +139,7 @@ def _load_transformers(model: str, llm_cfg: dict):
 def _load_openai(llm_cfg: dict):
     try:
         import openai
+
         api_base = llm_cfg.get("api_base", "http://localhost:8000/v1")
         api_key = llm_cfg.get("api_key", os.environ.get("OPENAI_API_KEY", "EMPTY"))
         client = openai.OpenAI(base_url=api_base, api_key=api_key)
@@ -187,8 +189,8 @@ def _build_messages(prompt: str, system_prompt: Optional[str]) -> list[dict]:
 
 
 def _generate_vllm(engine, prompts, system_prompt, max_tokens, temp, model_name):
-    from vllm import SamplingParams
     from transformers import AutoTokenizer
+    from vllm import SamplingParams
 
     try:
         tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
@@ -227,7 +229,7 @@ def _generate_transformers(engine, prompts, system_prompt, max_tokens, temp):
                     do_sample=temp > 0,
                     pad_token_id=tokenizer.eos_token_id,
                 )
-            generated = out[0][inputs["input_ids"].shape[1]:]
+            generated = out[0][inputs["input_ids"].shape[1] :]
             results.append(tokenizer.decode(generated, skip_special_tokens=True).strip())
         except Exception as e:
             logger.error(f"transformers generation error: {e}")
@@ -261,8 +263,7 @@ def generate_single(
     temperature: Optional[float] = None,
 ) -> Optional[str]:
     """Generate text for a single prompt. Returns None if GPU unavailable."""
-    results = generate([prompt], system_prompt=system_prompt,
-                       max_new_tokens=max_new_tokens, temperature=temperature)
+    results = generate([prompt], system_prompt=system_prompt, max_new_tokens=max_new_tokens, temperature=temperature)
     return results[0] if results else None
 
 

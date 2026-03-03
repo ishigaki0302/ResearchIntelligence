@@ -16,7 +16,7 @@ from typing import Optional
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.models import Item, Tag, ItemTag
+from app.core.models import Item, ItemTag
 from app.core.service import get_or_create_tag
 from app.gpu import is_gpu_available
 
@@ -47,6 +47,7 @@ def _build_tldr_prompt(item: Item) -> str:
     # Read extracted text if available
     if item.text_path:
         from app.core.config import resolve_path
+
         tp = resolve_path(item.text_path)
         if tp.exists():
             text = tp.read_text(encoding="utf-8")[:2000]
@@ -64,6 +65,7 @@ def _build_entity_prompt(item: Item) -> str:
         parts.append(f"要約: {item.tldr}")
     if item.text_path:
         from app.core.config import resolve_path
+
         tp = resolve_path(item.text_path)
         if tp.exists():
             parts.append(f"本文抜粋: {tp.read_text(encoding='utf-8')[:1500]}")
@@ -81,6 +83,7 @@ def _build_entity_prompt(item: Item) -> str:
 
 
 # ── TLDR Generation ───────────────────────────────────────────────────────
+
 
 def generate_tldr_batch(
     session: Session,
@@ -123,7 +126,7 @@ def generate_tldr_batch(
     processed = failed = 0
 
     for i in range(0, len(items), batch_size):
-        chunk = items[i:i + batch_size]
+        chunk = items[i : i + batch_size]
         prompts = [_build_tldr_prompt(it) for it in chunk]
 
         try:
@@ -144,8 +147,12 @@ def generate_tldr_batch(
         session.commit()
         logger.info(f"  TLDR progress: {i + len(chunk)}/{len(items)}")
 
-    return {"processed": processed, "skipped": len(items) - processed - failed,
-            "failed": failed, "gpu_available": gpu_ok}
+    return {
+        "processed": processed,
+        "skipped": len(items) - processed - failed,
+        "failed": failed,
+        "gpu_available": gpu_ok,
+    }
 
 
 # ── Entity Extraction ─────────────────────────────────────────────────────
@@ -196,7 +203,7 @@ def extract_entities_batch(
     processed = failed = tags_added = 0
 
     for i in range(0, len(items), batch_size):
-        chunk = items[i:i + batch_size]
+        chunk = items[i : i + batch_size]
         prompts = [_build_entity_prompt(it) for it in chunk]
 
         try:
@@ -232,11 +239,11 @@ def extract_entities_batch(
         session.commit()
         logger.info(f"  Entity progress: {i + len(chunk)}/{len(items)}")
 
-    return {"processed": processed, "tags_added": tags_added, "failed": failed,
-            "gpu_available": is_gpu_available()}
+    return {"processed": processed, "tags_added": tags_added, "failed": failed, "gpu_available": is_gpu_available()}
 
 
 # ── Combined Pipeline ─────────────────────────────────────────────────────
+
 
 def run_full_analysis(
     session: Session,
@@ -253,7 +260,5 @@ def run_full_analysis(
             session, venue_instance=venue_instance, item_ids=item_ids, overwrite=overwrite_tldr
         )
     if do_entities:
-        result["entities"] = extract_entities_batch(
-            session, venue_instance=venue_instance, item_ids=item_ids
-        )
+        result["entities"] = extract_entities_batch(session, venue_instance=venue_instance, item_ids=item_ids)
     return result

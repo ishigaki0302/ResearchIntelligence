@@ -9,6 +9,7 @@ def is_gpu_available() -> bool:
     """Return True if CUDA GPU is available."""
     try:
         import torch
+
         return torch.cuda.is_available()
     except ImportError:
         return False
@@ -19,6 +20,7 @@ def gpu_device_info() -> dict:
     if not is_gpu_available():
         return {}
     import torch
+
     return {
         "count": torch.cuda.device_count(),
         "devices": [

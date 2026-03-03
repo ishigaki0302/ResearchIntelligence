@@ -888,22 +888,26 @@ def nlp2026_analytics_redirect():
 def gpu_analytics(request: Request, venue: str = Query("")):
     """GPU analysis dashboard — works for any venue."""
     from app.analytics.collab_network import (
-        top_authors_ranking,
-        session_distribution,
-        keyword_frequency,
         build_coauthor_graph,
+        keyword_frequency,
+        session_distribution,
+        top_authors_ranking,
     )
     from app.gpu import is_gpu_available
 
     session = get_session()
     try:
         # Collect all distinct venues for the dropdown
-        all_venues = session.execute(
-            select(Item.venue_instance)
-            .where(Item.venue_instance.isnot(None), Item.status == "active")
-            .distinct()
-            .order_by(Item.venue_instance)
-        ).scalars().all()
+        all_venues = (
+            session.execute(
+                select(Item.venue_instance)
+                .where(Item.venue_instance.isnot(None), Item.status == "active")
+                .distinct()
+                .order_by(Item.venue_instance)
+            )
+            .scalars()
+            .all()
+        )
 
         if venue:
             top_authors = top_authors_ranking(session, venue_instance=venue, top_n=30)
@@ -912,9 +916,7 @@ def gpu_analytics(request: Request, venue: str = Query("")):
             graph = build_coauthor_graph(session, venue_instance=venue, min_edge_weight=1)
 
             total = session.execute(
-                select(func.count(Item.id)).where(
-                    Item.venue_instance == venue, Item.status == "active"
-                )
+                select(func.count(Item.id)).where(Item.venue_instance == venue, Item.status == "active")
             ).scalar()
             total_authors = session.execute(
                 select(func.count(func.distinct(ItemAuthor.author_id)))
