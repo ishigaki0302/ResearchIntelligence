@@ -1,6 +1,6 @@
 """PDF Corpus Ingest Pipeline.
 
-Ingests a directory of PDFs into the items table with type='paper'.
+Ingests a directory of PDFs into the items table with type='corpus'.
 Extracts title, abstract, and full text using pdfplumber.
 Idempotent: skips PDFs already registered by pdf_path.
 """
@@ -119,7 +119,7 @@ def ingest_pdf(pdf_path: Path, session: Session) -> tuple:
             text_path = str(text_file)
 
         item = Item(
-            type="paper",
+            type="corpus",
             title=extracted["title"],
             abstract=extracted["abstract"] or None,
             pdf_path=pdf_str,

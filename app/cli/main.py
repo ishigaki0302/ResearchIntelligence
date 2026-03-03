@@ -1435,6 +1435,35 @@ def corpus_ingest(
         session.close()
 
 
+@corpus_app.command("embed")
+def corpus_embed(
+    rebuild: bool = typer.Option(False, "--rebuild", help="Force re-embed all items (ignore cache)"),
+    umap: bool = typer.Option(True, "--umap/--no-umap", help="Run UMAP projection after embedding"),
+):
+    """Embed all corpus items and compute UMAP 2D coordinates.
+
+    Embeddings are cached in data/corpus/embeddings.npz.
+    UMAP coordinates are saved to data/corpus/umap2d.json.
+    Re-running without --rebuild only embeds new items.
+    """
+    from app.core.db import get_session, init_db
+    from app.pipelines.corpus_embed import compute_umap, embed_corpus
+
+    init_db()
+    session = get_session()
+    try:
+        result = embed_corpus(session, rebuild=rebuild)
+        typer.echo(
+            f"Embedding — total: {result['total']}, new: {result['embedded']}, "
+            f"cached: {result['cached']}, dim: {result['dim']}"
+        )
+        if umap and result["total"] > 0:
+            umap_result = compute_umap(rebuild=rebuild)
+            typer.echo(f"UMAP — projected {umap_result['total']} items -> {umap_result['output_path']}")
+    finally:
+        session.close()
+
+
 def main():
     app()
 

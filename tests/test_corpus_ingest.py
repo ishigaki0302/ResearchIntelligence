@@ -46,7 +46,7 @@ class TestIngestPdf:
         assert item is not None
         assert item.id is not None
         assert item.pdf_path == str(pdf.resolve())
-        assert item.type == "paper"
+        assert item.type == "corpus"
 
     def test_skips_duplicate_pdf(self, tmp_db, tmp_path):
         pdf = _make_fake_pdf(tmp_path / "paper_dup.pdf")
