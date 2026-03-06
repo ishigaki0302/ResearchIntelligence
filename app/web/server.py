@@ -878,6 +878,78 @@ def analytics_page(request: Request):
         session.close()
 
 
+@app.get("/analytics/nlp2026", response_class=HTMLResponse)
+def nlp2026_analytics_redirect():
+    """Backward-compatible redirect to generic GPU analytics page."""
+    return RedirectResponse(url="/analytics/gpu?venue=NLP2026", status_code=301)
+
+
+@app.get("/analytics/gpu", response_class=HTMLResponse)
+def gpu_analytics(request: Request, venue: str = Query("")):
+    """GPU analysis dashboard — works for any venue."""
+    from app.analytics.collab_network import (
+        build_coauthor_graph,
+        keyword_frequency,
+        session_distribution,
+        top_authors_ranking,
+    )
+    from app.gpu import is_gpu_available
+
+    session = get_session()
+    try:
+        # Collect all distinct venues for the dropdown
+        all_venues = (
+            session.execute(
+                select(Item.venue_instance)
+                .where(Item.venue_instance.isnot(None), Item.status == "active")
+                .distinct()
+                .order_by(Item.venue_instance)
+            )
+            .scalars()
+            .all()
+        )
+
+        if venue:
+            top_authors = top_authors_ranking(session, venue_instance=venue, top_n=30)
+            session_dist = session_distribution(session, venue_instance=venue)
+            keywords = keyword_frequency(session, venue_instance=venue, top_n=50)
+            graph = build_coauthor_graph(session, venue_instance=venue, min_edge_weight=1)
+
+            total = session.execute(
+                select(func.count(Item.id)).where(Item.venue_instance == venue, Item.status == "active")
+            ).scalar()
+            total_authors = session.execute(
+                select(func.count(func.distinct(ItemAuthor.author_id)))
+                .join(Item, Item.id == ItemAuthor.item_id)
+                .where(Item.venue_instance == venue, Item.status == "active")
+            ).scalar()
+        else:
+            top_authors = []
+            session_dist = []
+            keywords = []
+            graph = {"nodes": [], "edges": [], "stats": {"node_count": 0, "edge_count": 0}}
+            total = 0
+            total_authors = 0
+
+        return templates.TemplateResponse(
+            "gpu_analytics.html",
+            {
+                "request": request,
+                "venue": venue,
+                "all_venues": all_venues,
+                "total": total,
+                "total_authors": total_authors,
+                "top_authors": top_authors,
+                "session_dist": session_dist,
+                "keywords": keywords,
+                "graph": graph,
+                "gpu_available": is_gpu_available(),
+            },
+        )
+    finally:
+        session.close()
+
+
 @app.get("/papers", response_class=HTMLResponse)
 def papers_list(request: Request, page: int = Query(1, ge=1), per_page: int = Query(50, ge=1, le=100)):
     session = get_session()

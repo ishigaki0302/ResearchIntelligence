@@ -1,0 +1,203 @@
+{% extends "base.html" %}
+{% block title %}NLP2026 分析ダッシュボード{% endblock %}
+
+{% block extra_head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<style>
+  .dash-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+  .dash-grid .full-width { grid-column: 1 / -1; }
+  .panel { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 1rem; }
+  .panel h2 { font-size: 1rem; margin: 0 0 0.75rem; color: var(--accent); border-bottom: 1px solid var(--border); padding-bottom: 0.5rem; }
+  .chart-wrap { position: relative; height: 280px; }
+  .rank-list { list-style: none; }
+  .rank-list li { display: flex; justify-content: space-between; align-items: center; padding: 0.3rem 0; border-bottom: 1px solid #f0f0f0; font-size: 0.85rem; }
+  .rank-list li:last-child { border-bottom: none; }
+  .rank-num { color: var(--muted); min-width: 1.5rem; font-weight: 600; }
+  .rank-count { background: var(--accent-light); color: var(--accent); padding: 0.1rem 0.5rem; border-radius: 10px; font-size: 0.75rem; font-weight: 600; }
+  .gpu-badge { display: inline-block; padding: 0.2rem 0.75rem; border-radius: 12px; font-size: 0.75rem; font-weight: 600; }
+  .gpu-on { background: #d1fae5; color: #065f46; }
+  .gpu-off { background: #fef3c7; color: #92400e; }
+  .kw-cloud { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+  .kw-item { padding: 0.2rem 0.6rem; border-radius: 12px; background: var(--accent-light); color: var(--accent); font-size: 0.8rem; cursor: default; }
+  #network-svg { width: 100%; height: 380px; border: 1px solid var(--border); border-radius: 6px; background: #fafafa; }
+</style>
+{% endblock %}
+
+{% block content %}
+<h1>NLP2026 分析ダッシュボード
+  {% if gpu_available %}
+    <span class="gpu-badge gpu-on">GPU 利用可</span>
+  {% else %}
+    <span class="gpu-badge gpu-off">CPU のみ</span>
+  {% endif %}
+</h1>
+
+<!-- Summary Stats -->
+<div class="stats" style="margin-bottom:1.5rem">
+  <div class="stat-box"><div class="stat-num">{{ total }}</div><div class="stat-label">論文数</div></div>
+  <div class="stat-box"><div class="stat-num">{{ total_authors }}</div><div class="stat-label">著者数</div></div>
+  <div class="stat-box"><div class="stat-num">{{ session_dist|length }}</div><div class="stat-label">セッション系列</div></div>
+  <div class="stat-box"><div class="stat-num">{{ top_authors|length }}</div><div class="stat-label">分析著者数</div></div>
+</div>
+
+{% if not gpu_available %}
+<div style="background:#fef3c7;border:1px solid #f59e0b;padding:0.75rem 1rem;border-radius:6px;margin-bottom:1rem;font-size:0.9rem;">
+  ⚠️ GPU 未検出。LLM を使った TLDR 生成・エンティティ抽出は <code>ri llm-analyze all --venue NLP2026</code> を GPU 環境で実行してください。
+</div>
+{% endif %}
+
+<div class="dash-grid">
+
+  <!-- Session Distribution -->
+  <div class="panel">
+    <h2>📊 セッション系列別 論文数</h2>
+    <div class="chart-wrap">
+      <canvas id="sessionChart"></canvas>
+    </div>
+  </div>
+
+  <!-- Top Authors -->
+  <div class="panel">
+    <h2>👤 発表者ランキング Top 20</h2>
+    <ul class="rank-list">
+    {% for a in top_authors[:20] %}
+      <li>
+        <span><span class="rank-num">{{ loop.index }}.</span>
+          <a href="/search?author={{ a.name }}" style="color:var(--fg);text-decoration:none;">{{ a.name }}</a>
+        </span>
+        <span class="rank-count">{{ a.paper_count }} 件</span>
+      </li>
+    {% endfor %}
+    </ul>
+  </div>
+
+  <!-- Keyword Cloud -->
+  <div class="panel full-width">
+    <h2>🔑 頻出キーワード Top 50</h2>
+    <div class="kw-cloud">
+    {% for kw in keywords %}
+      {% set font_size = [0.7 + kw.score * 3, 1.6] | min %}
+      <span class="kw-item" style="font-size:{{ font_size }}rem;opacity:{{ [0.6 + kw.score, 1.0] | min }};"
+            title="score: {{ kw.score }}">{{ kw.keyword }}</span>
+    {% endfor %}
+    </div>
+  </div>
+
+  <!-- Co-author Network -->
+  <div class="panel full-width">
+    <h2>🔗 著者共著ネットワーク (Top 100 著者)</h2>
+    <p class="meta" style="margin-bottom:0.5rem">ノード数: {{ graph.stats.node_count }} | エッジ数: {{ graph.stats.edge_count }} | 表示: Top 100 著者</p>
+    <svg id="network-svg"></svg>
+  </div>
+
+  <!-- GPU Analysis Actions -->
+  <div class="panel full-width">
+    <h2>⚡ GPU 分析アクション</h2>
+    <p class="meta" style="margin-bottom:0.75rem">GPU 環境で以下のコマンドを実行すると、より高精度な分析が行えます。</p>
+    <div style="display:flex;gap:0.75rem;flex-wrap:wrap;">
+      <div class="card" style="flex:1;min-width:220px;margin:0">
+        <h3 style="font-size:0.9rem">PDF ダウンロード & テキスト抽出</h3>
+        <pre style="margin-top:0.5rem;font-size:0.75rem">python scripts/download_nlp2026_pdfs.py --workers 8</pre>
+      </div>
+      <div class="card" style="flex:1;min-width:220px;margin:0">
+        <h3 style="font-size:0.9rem">TLDR 自動生成 (Qwen2.5)</h3>
+        <pre style="margin-top:0.5rem;font-size:0.75rem">ri llm-analyze tldr --venue NLP2026</pre>
+      </div>
+      <div class="card" style="flex:1;min-width:220px;margin:0">
+        <h3 style="font-size:0.9rem">キーワード・手法抽出</h3>
+        <pre style="margin-top:0.5rem;font-size:0.75rem">ri llm-analyze extract-entities --venue NLP2026</pre>
+      </div>
+      <div class="card" style="flex:1;min-width:220px;margin:0">
+        <h3 style="font-size:0.9rem">GPU 埋め込み再構築</h3>
+        <pre style="margin-top:0.5rem;font-size:0.75rem">ri gpu embed --rebuild</pre>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// Session Distribution Chart
+const sessionData = {{ session_dist | tojson }};
+new Chart(document.getElementById('sessionChart'), {
+  type: 'bar',
+  data: {
+    labels: sessionData.map(d => d.series + '系'),
+    datasets: [{
+      label: '論文数',
+      data: sessionData.map(d => d.paper_count),
+      backgroundColor: '#2563eb88',
+      borderColor: '#2563eb',
+      borderWidth: 1,
+    }]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display: false } },
+    scales: { y: { beginAtZero: true } }
+  }
+});
+
+// Co-author Network with D3
+const graphData = {{ graph | tojson }};
+(function() {
+  const svg = d3.select('#network-svg');
+  const rect = document.getElementById('network-svg').getBoundingClientRect();
+  const W = rect.width || 900, H = 380;
+
+  if (!graphData.nodes.length) return;
+
+  const nodeMap = {};
+  graphData.nodes.forEach(n => { nodeMap[n.id] = n; });
+
+  const simulation = d3.forceSimulation(graphData.nodes)
+    .force('link', d3.forceLink(graphData.edges)
+      .id(d => d.id).distance(60).strength(d => Math.min(d.weight * 0.1, 0.8)))
+    .force('charge', d3.forceManyBody().strength(-80))
+    .force('center', d3.forceCenter(W / 2, H / 2))
+    .force('collision', d3.forceCollide().radius(14));
+
+  const g = svg.append('g');
+
+  svg.call(d3.zoom()
+    .scaleExtent([0.3, 5])
+    .on('zoom', (e) => g.attr('transform', e.transform)));
+
+  const link = g.append('g').selectAll('line')
+    .data(graphData.edges).join('line')
+    .attr('stroke', '#ccc')
+    .attr('stroke-width', d => Math.sqrt(d.weight));
+
+  const maxPapers = d3.max(graphData.nodes, d => d.paper_count) || 1;
+  const rScale = d3.scaleSqrt().domain([1, maxPapers]).range([4, 16]);
+
+  const node = g.append('g').selectAll('circle')
+    .data(graphData.nodes).join('circle')
+    .attr('r', d => rScale(d.paper_count))
+    .attr('fill', '#2563eb')
+    .attr('opacity', 0.7)
+    .attr('stroke', '#fff').attr('stroke-width', 1.5)
+    .call(d3.drag()
+      .on('start', (e, d) => { if (!e.active) simulation.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y; })
+      .on('drag', (e, d) => { d.fx = e.x; d.fy = e.y; })
+      .on('end', (e, d) => { if (!e.active) simulation.alphaTarget(0); d.fx = null; d.fy = null; }));
+
+  node.append('title').text(d => `${d.name} (${d.paper_count}件)`);
+
+  const label = g.append('g').selectAll('text')
+    .data(graphData.nodes.filter(d => d.paper_count >= 3)).join('text')
+    .text(d => d.name.split(' ')[0])  // 名字（先頭要素）を表示
+    .attr('font-size', 10).attr('fill', '#333')
+    .attr('text-anchor', 'middle').attr('dy', '-0.8em')
+    .style('pointer-events', 'none');
+
+  simulation.on('tick', () => {
+    link.attr('x1', d => d.source.x).attr('y1', d => d.source.y)
+        .attr('x2', d => d.target.x).attr('y2', d => d.target.y);
+    node.attr('cx', d => d.x).attr('cy', d => d.y);
+    label.attr('x', d => d.x).attr('y', d => d.y);
+  });
+})();
+</script>
+{% endblock %}

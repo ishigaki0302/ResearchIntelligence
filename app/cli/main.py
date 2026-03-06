@@ -680,14 +680,18 @@ def enrich(
 
 @app.command()
 def serve(
-    host: str = typer.Option("127.0.0.1", "--host", help="Host to bind to"),
-    port: int = typer.Option(8000, "--port", help="Port to listen on"),
+    host: str = typer.Option(None, "--host", help="Host to bind to"),
+    port: int = typer.Option(None, "--port", help="Port to listen on"),
 ):
     """Start the web UI server."""
     import uvicorn
 
+    from app.core.config import get_config
     from app.core.db import init_db
 
+    cfg = get_config().get("web", {})
+    host = host or cfg.get("host", "0.0.0.0")
+    port = port or cfg.get("port", 8502)
     init_db()
     uvicorn.run("app.web.server:app", host=host, port=port, reload=True)
 
@@ -1399,6 +1403,153 @@ def version_unlink(
         item.version_group_id = None
         session.commit()
         typer.echo(f"Removed item {item_id} from its version group.")
+    finally:
+        session.close()
+
+
+gpu_app = typer.Typer(name="gpu", help="GPU-accelerated analysis (requires CUDA)")
+app.add_typer(gpu_app)
+
+llm_app = typer.Typer(name="llm-analyze", help="LLM-based paper analysis")
+app.add_typer(llm_app)
+
+
+@gpu_app.command("status")
+def gpu_status():
+    """Show GPU availability and device info."""
+    from app.gpu import gpu_device_info, is_gpu_available
+
+    if is_gpu_available():
+        info = gpu_device_info()
+        typer.echo(f"GPU: 利用可能 ({info['count']} デバイス)")
+        for d in info["devices"]:
+            typer.echo(f"  [{d['index']}] {d['name']} ({d['memory_gb']} GB)")
+    else:
+        typer.echo("GPU: 利用不可 (CUDA なし)")
+
+
+@gpu_app.command("embed")
+def gpu_embed(
+    rebuild: bool = typer.Option(True, "--rebuild/--no-rebuild", help="Rebuild FAISS index with GPU embeddings"),
+    venue: str = typer.Option("", "--venue", help="Filter by venue_instance"),
+):
+    """Rebuild FAISS index using GPU embedding model (BGE-M3)."""
+    from app.gpu import is_gpu_available
+    from app.gpu.embedder import get_gpu_embedder
+
+    if not is_gpu_available():
+        typer.echo("GPU が利用できません。通常の sentence-transformers を使用してください。", err=True)
+        raise typer.Exit(1)
+
+    embedder = get_gpu_embedder()
+    if embedder is None:
+        typer.echo("GPU 埋め込みモデルのロードに失敗しました。", err=True)
+        raise typer.Exit(1)
+
+    typer.echo(f"GPU 埋め込みモデル準備完了: dim={embedder.get_sentence_embedding_dimension()}")
+
+    if rebuild:
+        from app.core.db import get_session, init_db
+        from app.indexing.engine import rebuild_faiss
+
+        init_db()
+        session = get_session()
+        try:
+            typer.echo("FAISS インデックスを GPU 埋め込みで再構築中...")
+            rebuild_faiss(session)
+            typer.echo("完了")
+        finally:
+            session.close()
+
+
+@llm_app.command("tldr")
+def llm_tldr(
+    venue: str = typer.Option("NLP2026", "--venue", help="Target venue_instance"),
+    overwrite: bool = typer.Option(False, "--overwrite", help="Overwrite existing TLDRs"),
+    limit: int = typer.Option(0, "--limit", help="Max items (0=all)"),
+):
+    """Generate TLDRs for papers using LLM (Qwen2.5)."""
+    from app.core.db import get_session, init_db
+    from app.pipelines.llm_analyze import generate_tldr_batch
+
+    init_db()
+    session = get_session()
+    try:
+        typer.echo(f"TLDR 生成開始: venue={venue}, overwrite={overwrite}")
+        item_ids = None
+        if limit:
+            from sqlalchemy import select
+
+            from app.core.models import Item
+
+            items = (
+                session.execute(
+                    select(Item.id).where(Item.venue_instance == venue, Item.status == "active").limit(limit)
+                )
+                .scalars()
+                .all()
+            )
+            item_ids = list(items)
+
+        result = generate_tldr_batch(session, venue_instance=venue, item_ids=item_ids, overwrite=overwrite)
+        typer.echo(f"完了: 生成={result['processed']}, スキップ={result['skipped']}, 失敗={result['failed']}")
+        if not result.get("gpu_available"):
+            typer.echo("※ GPU なし環境のためスキップされました", err=True)
+    finally:
+        session.close()
+
+
+@llm_app.command("extract-entities")
+def llm_extract_entities(
+    venue: str = typer.Option("NLP2026", "--venue", help="Target venue_instance"),
+    limit: int = typer.Option(0, "--limit", help="Max items (0=all)"),
+    batch_size: int = typer.Option(4, "--batch-size", help="Items per LLM batch (reduce if OOM)"),
+):
+    """Extract NLP tasks/methods/datasets from papers using LLM."""
+    from app.core.db import get_session, init_db
+    from app.pipelines.llm_analyze import extract_entities_batch
+
+    init_db()
+    session = get_session()
+    try:
+        typer.echo(f"エンティティ抽出開始: venue={venue}, batch_size={batch_size}")
+        item_ids = None
+        if limit:
+            from sqlalchemy import select
+
+            from app.core.models import Item
+
+            items = (
+                session.execute(
+                    select(Item.id).where(Item.venue_instance == venue, Item.status == "active").limit(limit)
+                )
+                .scalars()
+                .all()
+            )
+            item_ids = list(items)
+
+        result = extract_entities_batch(session, venue_instance=venue, item_ids=item_ids, batch_size=batch_size)
+        typer.echo(f"完了: 処理={result['processed']}, タグ追加={result['tags_added']}, 失敗={result['failed']}")
+    finally:
+        session.close()
+
+
+@llm_app.command("all")
+def llm_all(
+    venue: str = typer.Option("NLP2026", "--venue", help="Target venue_instance"),
+    overwrite_tldr: bool = typer.Option(False, "--overwrite-tldr", help="Overwrite existing TLDRs"),
+):
+    """Run all LLM analyses (TLDR + entity extraction)."""
+    from app.core.db import get_session, init_db
+    from app.pipelines.llm_analyze import run_full_analysis
+
+    init_db()
+    session = get_session()
+    try:
+        typer.echo(f"LLM 全分析開始: venue={venue}")
+        result = run_full_analysis(session, venue_instance=venue, overwrite_tldr=overwrite_tldr)
+        for key, val in result.items():
+            typer.echo(f"  {key}: {val}")
     finally:
         session.close()
 
